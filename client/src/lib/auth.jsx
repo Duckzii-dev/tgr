@@ -22,14 +22,20 @@ export function AuthProvider({ children }) {
     refresh();
   }, [refresh]);
 
-  const login = async (email, password) => {
-    const { user } = await api.post('/auth/login', { email, password });
+  const login = async (email, password, turnstileToken) => {
+    const { user } = await api.post('/auth/login', {
+      email,
+      password,
+      turnstileToken,
+    });
     setUser(user);
   };
-  const register = async (email, password, name) => {
-    const { user } = await api.post('/auth/register', { email, password, name });
+  const register = async (email, password, name, turnstileToken) => {
+    const { user } = await api.post('/auth/register', {
+      email, password, name, turnstileToken,
+    });
     setUser(user);
-  };
+  };s
   const logout = async () => {
     await api.post('/auth/logout');
     setUser(null);
