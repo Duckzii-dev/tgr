@@ -1,9 +1,7 @@
+import { Turnstile } from '@marsidev/react-turnstile';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../lib/auth.jsx';
-import { useToast } from '../lib/toast.jsx';
-import { api } from '../lib/api.js';
-import { Chrome } from 'lucide-react';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 export default function Register() {
   const { register } = useAuth();
@@ -13,17 +11,25 @@ export default function Register() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey, setTurnstileKey] = useState(0); // reset widget sau lỗi
 
   const submit = async (e) => {
     e.preventDefault();
     if (password.length < 8) return toast('Password must be 8+ characters', 'error');
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      return toast('Vui lòng xác nhận captcha', 'error');
+    }
     setLoading(true);
     try {
-      await register(email, password, name);
+      await register(email, password, name, turnstileToken);
       toast('Account created');
       nav('/');
     } catch (e) {
       toast(e.message, 'error');
+      // Reset Turnstile vì token chỉ dùng 1 lần
+      setTurnstileToken('');
+      setTurnstileKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -45,33 +51,32 @@ export default function Register() {
         <form onSubmit={submit} className="space-y-3">
           <div>
             <label className="label">Name</label>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
             <label className="label">Email</label>
-            <input
-              className="input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <input className="input" type="email" value={email}
+              onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div>
             <label className="label">Password</label>
-            <input
-              className="input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
+            <input className="input" type="password" value={password}
+              onChange={(e) => setPassword(e.target.value)} required minLength={8} />
           </div>
+
+          {TURNSTILE_SITE_KEY && (
+            <div className="flex justify-center">
+              <Turnstile
+                key={turnstileKey}
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onError={() => setTurnstileToken('')}
+                onExpire={() => setTurnstileToken('')}
+                options={{ theme: 'dark', size: 'normal' }}
+              />
+            </div>
+          )}
+
           <button className="btn btn-primary w-full justify-center" disabled={loading}>
             {loading ? 'Creating...' : 'Create Account'}
           </button>
@@ -81,13 +86,10 @@ export default function Register() {
           <div className="flex-1 h-px bg-ink-700" />
         </div>
         <button className="btn btn-ghost w-full justify-center" onClick={google}>
-          <Chrome className="w-4 h-4" /> Continue with Google
+          Continue with Google
         </button>
         <div className="text-center text-sm text-ink-400 mt-4">
-          Have an account?{' '}
-          <Link to="/login" className="text-accent">
-            Sign in
-          </Link>
+          Have an account? <Link to="/login" className="text-accent">Sign in</Link>
         </div>
       </div>
     </div>
