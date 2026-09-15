@@ -1,17 +1,20 @@
+
 import crypto from 'crypto';
 
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 const CSRF_COOKIE = 'csrf_token';
 const CSRF_HEADER = 'x-csrf-token';
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
 export function issueCsrfToken(req, res, next) {
   let token = req.cookies?.[CSRF_COOKIE];
   if (!token) {
     token = crypto.randomBytes(32).toString('hex');
     res.cookie(CSRF_COOKIE, token, {
-      httpOnly: false,        // client JS phải đọc được
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      httpOnly: false,
+      secure: IS_PROD,
+      sameSite: IS_PROD ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30,
       path: '/',
     });
