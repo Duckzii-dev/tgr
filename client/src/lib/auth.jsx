@@ -30,12 +30,17 @@ export function AuthProvider({ children }) {
     });
     setUser(user);
   };
+
   const register = async (email, password, name, turnstileToken) => {
     const { user } = await api.post('/auth/register', {
-      email, password, name, turnstileToken,
+      email,
+      password,
+      name,
+      turnstileToken,
     });
     setUser(user);
-  };s
+  };
+
   const logout = async () => {
     await api.post('/auth/logout');
     setUser(null);
