@@ -4,10 +4,12 @@ import crypto from 'crypto';
 import { prisma } from '../utils/prisma.js';
 import { httpError } from '../middleware/error.middleware.js';
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
 const COOKIE_OPTS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  secure: IS_PROD,
+  sameSite: IS_PROD ? 'none' : 'lax',
   maxAge: 1000 * 60 * 60 * 24 * 30,
   path: '/',
 };
@@ -61,8 +63,8 @@ export function googleStart(req, res) {
   const state = crypto.randomBytes(16).toString('hex');
   res.cookie('oauth_state', state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: IS_PROD,
+    sameSite: IS_PROD ? 'none' : 'lax',   // ← sửa
     maxAge: 1000 * 60 * 10,
     path: '/',
   });
