@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String?
+  name          String?
+  googleId      String?  @unique
+  emailVerified Boolean  @default(false)
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workouts          Workout[]
+  bodyWeights       BodyWeight[]
+  trainingSchedules TrainingSchedule[]
+  goals             Goal[]
+  personalRecords   PersonalRecord[]
+  exercises         Exercise[]
+
+  @@index([email])
+  @@index([googleId])
+}
+
+model Exercise {
+  id          String   @id @default(cuid())
+  name        String
+  muscleGroup String
+  equipment   String?
+  isCustom    Boolean  @default(false)
+  userId      String?
+  createdAt   DateTime @default(now())
+
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutExercises WorkoutExercise[]
+  personalRecords  PersonalRecord[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([muscleGroup])
+}
+
+model Workout {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  startTime   DateTime?
+  endTime     DateTime?
+  duration    Int?
+  notes       String?  @db.Text
+  workoutType String   @default("strength")
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises WorkoutExercise[]
+
+  @@index([userId])
+  @@index([date])
+  @@index([createdAt])
+}
+
+model WorkoutExercise {
+  id         String   @id @default(cuid())
+  workoutId  String
+  exerciseId String
+  order      Int      @default(0)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  sets     WorkoutSet[]
+
+  @@index([workoutId])
+  @@index([exerciseId])
+}
+
+model WorkoutSet {
+  id                String   @id @default(cuid())
+  workoutExerciseId String
+  setNumber         Int
+  weight            Float
+  reps              Int
+  rir               Int?
+  rpe               Float?
+  restSeconds       Int?
+  estimated1RM      Float?
+  isWarmup          Boolean  @default(false)
+  completed         Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([workoutExerciseId])
+  @@index([createdAt])
+}
+
+model BodyWeight {
+  id         String   @id @default(cuid())
+  userId     String
+  weight     Float
+  recordedAt DateTime
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([recordedAt])
+}
+
+model TrainingSchedule {
+  id          String   @id @default(cuid())
+  userId      String
+  weekday     Int
+  workoutType String
+  isPlanned   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekday])
+  @@index([userId])
+}
+
+model Goal {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  target     Float
+  current    Float     @default(0)
+  unit       String?
+  exerciseId String?
+  deadline   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PersonalRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  exerciseId String
+  type       String
+  value      Float
+  reps       Int?
+  weight     Float?
+  achievedAt DateTime
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([exerciseId])
+  @@index([achievedAt])
+}

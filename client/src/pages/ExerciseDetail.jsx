@@ -1,0 +1,199 @@
+import { useState, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
+import { useFetch } from '../hooks/useFetch.js';
+import { api } from '../lib/api.js';
+import Skeleton from '../components/Skeleton.jsx';
+import Empty from '../components/Empty.jsx';
+import StatCard from '../components/StatCard.jsx';
+import LineChartCard from '../components/LineChartCard.jsx';
+import { fmtDate, fmtNumber } from '../lib/format.js';
+
+const TABS = ['Overview', 'History', 'Progression', 'PRs'];
+const RANGES = { '30D': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 99999 };
+
+export default function ExerciseDetail() {
+  const { id } = useParams();
+  const [tab, setTab] = useState('Overview');
+  const [range, setRange] = useState('3M');
+  const { data, loading, error, refresh } = useFetch(
+    () => api.get(`/exercises/${id}`),
+    [id]
+  );
+
+  const progression = useMemo(() => {
+    if (!data?.sessions) return [];
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - RANGES[range]);
+    const byDay = new Map();
+    for (const sess of data.sessions) {
+      if (new Date(sess.date) < cutoff) continue;
+      const k = new Date(sess.date).toISOString().slice(0, 10);
+      if (!byDay.has(k))
+        byDay.set(k, { date: k, maxWeight: 0, volume: 0, reps: 0, estimated1RM: 0 });
+      const d = byDay.get(k);
+      for (const s of sess.sets) {
+        if (s.weight > d.maxWeight) d.maxWeight = s.weight;
+        d.volume += s.weight * s.reps;
+        d.reps += s.reps;
+        if (s.estimated1RM && s.estimated1RM > d.estimated1RM)
+          d.estimated1RM = s.estimated1RM;
+      }
+    }
+    return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }, [data, range]);
+
+  if (loading)
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="card p-4 text-red-400 text-sm">
+        {error}{' '}
+        <button className="underline ml-2" onClick={refresh}>
+          Retry
+        </button>
+      </div>
+    );
+  if (!data?.exercise) return <Empty title="Exercise not found" />;
+
+  const { exercise, stats, prs, sessions } = data;
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-4">
+        <h1 className="text-2xl font-semibold">{exercise.name}</h1>
+        <div className="text-sm text-ink-400 capitalize">
+          {exercise.muscleGroup} · {exercise.equipment || '—'}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Current Best" value={`${stats.currentBest}kg`} />
+        <StatCard label="Starting" value={`${stats.startingWeight}kg`} />
+        <StatCard label="Best 1RM (est)" value={`${fmtNumber(stats.best1RM, 1)}kg`} />
+        <StatCard label="Best 5 reps" value={`${stats.best5}kg`} />
+        <StatCard label="Best 10 reps" value={`${stats.best10}kg`} />
+        <StatCard label="Total Sets" value={stats.totalSets} />
+        <StatCard label="Total Reps" value={fmtNumber(stats.totalReps)} />
+        <StatCard label="Sessions" value={stats.totalSessions} />
+      </div>
+
+      <div className="flex gap-1 border-b border-ink-700 overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-sm whitespace-nowrap ${
+              tab === t ? 'text-accent border-b-2 border-accent' : 'text-ink-400 hover:text-white'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'Overview' && (
+        <div className="space-y-3">
+          <div className="flex gap-1 flex-wrap">
+            {Object.keys(RANGES).map((r) => (
+              <button
+                key={r}
+                className={`chip ${range === r ? 'border-accent text-accent' : ''}`}
+                onClick={() => setRange(r)}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <div className="grid lg:grid-cols-2 gap-3">
+            <div className="card p-4">
+              <div className="text-sm mb-2 text-ink-300">Weight over time</div>
+              <LineChartCard data={progression} lines={[{ key: 'maxWeight', name: 'kg' }]} />
+            </div>
+            <div className="card p-4">
+              <div className="text-sm mb-2 text-ink-300">Estimated 1RM over time</div>
+              <LineChartCard
+                data={progression}
+                lines={[{ key: 'estimated1RM', name: '1RM', color: '#ffb038' }]}
+              />
+            </div>
+            <div className="card p-4">
+              <div className="text-sm mb-2 text-ink-300">Volume over time</div>
+              <LineChartCard
+                data={progression}
+                lines={[{ key: 'volume', name: 'kg', color: '#5ed3ff' }]}
+              />
+            </div>
+            <div className="card p-4">
+              <div className="text-sm mb-2 text-ink-300">Reps over time</div>
+              <LineChartCard
+                data={progression}
+                lines={[{ key: 'reps', name: 'reps', color: '#b494ff' }]}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'History' &&
+        (sessions.length ? (
+          <div className="space-y-2">
+            {[...sessions].reverse().map((s) => (
+              <div key={s.workoutId} className="card p-4">
+                <div className="flex justify-between mb-2">
+                  <div className="font-medium">{s.name}</div>
+                  <div className="text-xs text-ink-400">{fmtDate(s.date)}</div>
+                </div>
+                <div className="text-xs text-ink-300 space-y-0.5">
+                  {s.sets.map((set, i) => (
+                    <div key={set.id}>
+                      {i + 1}. {set.weight}kg × {set.reps}
+                      {set.rir != null ? ` (RIR ${set.rir})` : ''}
+                      {set.estimated1RM ? ` · ${set.estimated1RM.toFixed(1)} 1RM` : ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty title="No history yet" />
+        ))}
+
+      {tab === 'Progression' && (
+        <div className="card p-4">
+          <div className="text-sm mb-2 text-ink-300">Weight progression</div>
+          <LineChartCard
+            data={progression}
+            lines={[{ key: 'maxWeight', name: 'kg' }]}
+            height={320}
+          />
+        </div>
+      )}
+
+      {tab === 'PRs' &&
+        (prs.length ? (
+          <div className="space-y-2">
+            {prs.map((p) => (
+              <div key={p.id} className="card p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-sm capitalize">{p.type.replace('_', ' ')}</div>
+                  <div className="text-xs text-ink-400">
+                    {fmtDate(p.achievedAt)}
+                    {p.reps ? ` · ${p.weight}kg × ${p.reps}` : ''}
+                  </div>
+                </div>
+                <div className="text-accent font-semibold">{fmtNumber(p.value, 1)}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty title="No PRs yet" />
+        ))}
+    </div>
+  );
+}
