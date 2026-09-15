@@ -22,7 +22,8 @@ export async function listWorkouts(req, res) {
   });
 
   let filtered = workouts;
-  if (minDuration) filtered = filtered.filter((w) => (w.duration || 0) >= Number(minDuration) * 60);
+  if (minDuration)
+    filtered = filtered.filter((w) => (w.duration || 0) >= Number(minDuration) * 60);
   if (minVolume) {
     filtered = filtered.filter((w) => {
       const v = w.exercises.reduce(
@@ -37,8 +38,12 @@ export async function listWorkouts(req, res) {
       where: { userId },
       select: { achievedAt: true },
     });
-    const dates = new Set(prs.map((p) => new Date(p.achievedAt).toISOString().slice(0, 10)));
-    filtered = filtered.filter((w) => dates.has(new Date(w.date).toISOString().slice(0, 10)));
+    const dates = new Set(
+      prs.map((p) => new Date(p.achievedAt).toISOString().slice(0, 10))
+    );
+    filtered = filtered.filter((w) =>
+      dates.has(new Date(w.date).toISOString().slice(0, 10))
+    );
   }
 
   const result = filtered.map((w) => {
@@ -59,6 +64,7 @@ export async function listWorkouts(req, res) {
       date: w.date,
       workoutType: w.workoutType,
       duration: w.duration,
+      notes: w.notes,
       ...stats,
     };
   });
@@ -68,7 +74,7 @@ export async function listWorkouts(req, res) {
 
 export async function createWorkout(req, res) {
   const userId = req.user.id;
-  const { name, date, workoutType, notes } = req.body;
+  const { name, date, workoutType, notes, duration } = req.body;
   if (!name) throw httpError(400, 'name required');
   const workout = await prisma.workout.create({
     data: {
@@ -76,7 +82,8 @@ export async function createWorkout(req, res) {
       name,
       date: date ? new Date(date) : new Date(),
       workoutType: workoutType || 'strength',
-      notes,
+      notes: notes || null,
+      duration: duration != null ? Number(duration) : null,
     },
   });
   res.status(201).json({ workout });
@@ -99,12 +106,12 @@ export async function getWorkout(req, res) {
 
 export async function updateWorkout(req, res) {
   const { id } = req.params;
-  const { name, notes, workoutType, startTime, endTime, date } = req.body;
+  const { name, notes, workoutType, startTime, endTime, date, duration } = req.body;
   const workout = await prisma.workout.findFirst({ where: { id, userId: req.user.id } });
   if (!workout) throw httpError(404, 'Workout not found');
 
-  let duration = workout.duration;
-  if (startTime && endTime) duration = durationSeconds(startTime, endTime);
+  let finalDuration = duration != null ? Number(duration) : workout.duration;
+  if (startTime && endTime) finalDuration = durationSeconds(startTime, endTime);
 
   const updated = await prisma.workout.update({
     where: { id },
@@ -115,7 +122,7 @@ export async function updateWorkout(req, res) {
       date: date ? new Date(date) : workout.date,
       startTime: startTime ? new Date(startTime) : workout.startTime,
       endTime: endTime ? new Date(endTime) : workout.endTime,
-      duration,
+      duration: finalDuration,
     },
   });
   res.json({ workout: updated });
@@ -138,14 +145,27 @@ export async function finishWorkout(req, res) {
   });
   if (!workout) throw httpError(404, 'Workout not found');
 
+  const isBackfill = workout.startTime === null && workout.duration !== null;
   const endTime = new Date();
-  const startTime = workout.startTime || workout.createdAt;
-  const duration = durationSeconds(startTime, endTime);
+  let duration = workout.duration;
 
-  const updated = await prisma.workout.update({
-    where: { id },
-    data: { endTime, startTime, duration },
-  });
+  if (!isBackfill && !workout.startTime) {
+    // Workout chưa finish lần nào — set start/end bằng createdAt/now
+    const startTime = workout.createdAt;
+    duration = durationSeconds(startTime, endTime);
+    await prisma.workout.update({
+      where: { id },
+      data: { endTime, startTime, duration },
+    });
+  } else if (!isBackfill && workout.startTime && !workout.endTime) {
+    // Có startTime nhưng chưa có endTime — finish bình thường
+    duration = durationSeconds(workout.startTime, endTime);
+    await prisma.workout.update({
+      where: { id },
+      data: { endTime, duration },
+    });
+  }
+  // Nếu isBackfill → giữ nguyên duration đã set, không đụng start/end
 
   let totalSets = 0;
   let totalReps = 0;
@@ -175,10 +195,12 @@ export async function finishWorkout(req, res) {
     }
   }
 
+  const updated = await prisma.workout.findUnique({ where: { id } });
+
   res.json({
     workout: updated,
     summary: {
-      duration,
+      duration: updated.duration,
       exercises: workout.exercises.length,
       sets: totalSets,
       reps: totalReps,
@@ -221,26 +243,31 @@ export async function previousSession(req, res) {
   const we = await prisma.workoutExercise.findFirst({
     where: {
       exerciseId,
-      workout: { userId: req.user.id, date: { lt: before ? new Date(before) : new Date() } },
+      workout: {
+        userId: req.user.id,
+        date: { lt: before ? new Date(before) : new Date() },
+      },
     },
     include: { sets: { orderBy: { setNumber: 'asc' } }, workout: true },
     orderBy: { workout: { date: 'desc' } },
   });
   res.json({
-    previous: we ? { workoutId: we.workoutId, date: we.workout.date, sets: we.sets } : null,
+    previous: we
+      ? { workoutId: we.workoutId, date: we.workout.date, sets: we.sets }
+      : null,
   });
 }
 
 export async function addSet(req, res) {
   const { weId } = req.params;
   const { weight, reps, rir, rpe, restSeconds, isWarmup } = req.body;
-
   const we = await prisma.workoutExercise.findFirst({
     where: { id: weId, workout: { userId: req.user.id } },
   });
   if (!we) throw httpError(404, 'Workout exercise not found');
-
-  const count = await prisma.workoutSet.count({ where: { workoutExerciseId: weId } });
+  const count = await prisma.workoutSet.count({
+    where: { workoutExerciseId: weId },
+  });
   const set = await prisma.workoutSet.create({
     data: {
       workoutExerciseId: weId,
@@ -307,8 +334,9 @@ export async function duplicatePrevious(req, res) {
     orderBy: { workout: { date: 'desc' } },
   });
   if (!prev || prev.sets.length === 0) return res.json({ created: 0 });
-
-  const existingCount = await prisma.workoutSet.count({ where: { workoutExerciseId: weId } });
+  const existingCount = await prisma.workoutSet.count({
+    where: { workoutExerciseId: weId },
+  });
   const data = prev.sets.map((s, i) => ({
     workoutExerciseId: weId,
     setNumber: existingCount + i + 1,
@@ -322,18 +350,19 @@ export async function duplicatePrevious(req, res) {
   await prisma.workoutSet.createMany({ data });
   res.json({ created: data.length });
 }
+
 export async function bulkDeleteWorkouts(req, res) {
-    const userId = req.user.id;
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) throw httpError(400, 'ids required');
-  
-    const workouts = await prisma.workout.findMany({
-      where: { id: { in: ids }, userId },
-      select: { id: true },
-    });
-    const allowed = workouts.map((w) => w.id);
-    if (allowed.length === 0) throw httpError(404, 'No matching workouts');
-  
-    await prisma.workout.deleteMany({ where: { id: { in: allowed } } });
-    res.json({ deleted: allowed.length });
-  }
+  const userId = req.user.id;
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) throw httpError(400, 'ids required');
+
+  const workouts = await prisma.workout.findMany({
+    where: { id: { in: ids }, userId },
+    select: { id: true },
+  });
+  const allowed = workouts.map((w) => w.id);
+  if (allowed.length === 0) throw httpError(404, 'No matching workouts');
+
+  await prisma.workout.deleteMany({ where: { id: { in: allowed } } });
+  res.json({ deleted: allowed.length });
+}

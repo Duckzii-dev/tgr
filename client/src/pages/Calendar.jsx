@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
@@ -19,10 +19,13 @@ const STATUS_LABEL = {
   unplanned: 'Unplanned',
 };
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 export default function CalendarPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const navigate = useNavigate();
 
   const { data, loading, error, refresh } = useFetch(
     () => api.get(`/calendar?year=${year}&month=${month}`),
@@ -58,6 +61,17 @@ export default function CalendarPage() {
     year: 'numeric',
   });
 
+  const handleDayClick = (day) => {
+    const hasWorkout = day.workouts.length > 0;
+    if (hasWorkout) {
+      navigate(`/workouts/${day.workouts[0].id}`);
+    } else {
+      const isFuture = day.date > todayISO();
+      if (isFuture) return;
+      navigate(`/workouts/new?date=${day.date}`);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -79,6 +93,9 @@ export default function CalendarPage() {
             {v}
           </span>
         ))}
+        <span className="chip border border-ink-700">
+          Click ngày trống để log bù
+        </span>
       </div>
 
       {error && (
@@ -103,23 +120,39 @@ export default function CalendarPage() {
           </div>
           <div className="grid grid-cols-7 gap-1">
             {grid.flat().map((day, i) => {
-              if (!day) return <div key={i} className="aspect-square rounded-lg bg-ink-900/40" />;
+              if (!day)
+                return <div key={i} className="aspect-square rounded-lg bg-ink-900/40" />;
               const d = new Date(day.date);
+              const hasWorkout = day.workouts.length > 0;
+              const isFuture = day.date > todayISO();
+
               return (
-                <Link
+                <button
                   key={i}
-                  to={day.workouts[0] ? `/workouts/${day.workouts[0].id}` : '#'}
-                  className={`aspect-square rounded-lg border p-1.5 text-xs flex flex-col ${
-                    STATUS_COLORS[day.status] || 'bg-ink-800 text-ink-400 border-ink-700'
-                  } ${day.workouts[0] ? 'hover:border-accent' : ''}`}
+                  type="button"
+                  disabled={isFuture && !hasWorkout}
+                  onClick={() => handleDayClick(day)}
+                  className={`aspect-square rounded-lg border p-1.5 text-xs flex flex-col text-left transition-colors ${
+                    STATUS_COLORS[day.status] ||
+                    'bg-ink-800 text-ink-400 border-ink-700'
+                  } ${
+                    !isFuture || hasWorkout
+                      ? 'hover:border-accent cursor-pointer'
+                      : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  title={
+                    hasWorkout
+                      ? 'Mở workout'
+                      : isFuture
+                      ? 'Không thể log tương lai'
+                      : 'Log bù ngày này'
+                  }
                 >
                   <div className="text-[11px] opacity-80">{d.getDate()}</div>
                   <div className="mt-auto truncate text-[10px]">
-                    {day.workouts.length > 0
-                      ? day.workouts[0].name
-                      : STATUS_LABEL[day.status]}
+                    {hasWorkout ? day.workouts[0].name : STATUS_LABEL[day.status]}
                   </div>
-                </Link>
+                </button>
               );
             })}
           </div>
