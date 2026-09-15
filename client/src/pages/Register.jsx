@@ -1,5 +1,9 @@
-import { Turnstile } from '@marsidev/react-turnstile';
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Turnstile } from '@marsidev/react-turnstile';
+import { useAuth } from '../lib/auth.jsx';
+import { useToast } from '../lib/toast.jsx';
+import { api } from '../lib/api.js';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
@@ -12,7 +16,7 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [turnstileKey, setTurnstileKey] = useState(0); // reset widget sau lỗi
+  const [turnstileKey, setTurnstileKey] = useState(0);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -22,12 +26,11 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register(email, password, name, turnstileToken);
+      await register(email.trim().toLowerCase(), password, name, turnstileToken);
       toast('Account created');
       nav('/');
     } catch (e) {
       toast(e.message, 'error');
-      // Reset Turnstile vì token chỉ dùng 1 lần
       setTurnstileToken('');
       setTurnstileKey((k) => k + 1);
     } finally {
