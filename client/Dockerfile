@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 5173
 
-CMD ["sh", "-c", "npm run build && npx vite preview --host 0.0.0.0 --port 5173 --allowedHosts .up.railway.app"]
+CMD ["sh", "-c", "npm run build && npx vite preview --host 0.0.0.0 --port 5173"]
