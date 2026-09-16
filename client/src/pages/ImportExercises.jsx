@@ -1,3 +1,4 @@
+cat > ~/Code/tgr/client/src/pages/ImportExercises.jsx <<'ENDOFFILE'
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Play } from 'lucide-react';
@@ -119,3 +120,4 @@ export default function ImportExercises() {
     </div>
   );
 }
+ENDOFFILE
