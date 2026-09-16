@@ -2,7 +2,9 @@
     FROM node:20-alpine AS client-builder
 
     ARG VITE_TURNSTILE_SITE_KEY
+    ARG VITE_API_URL
     ENV VITE_TURNSTILE_SITE_KEY=$VITE_TURNSTILE_SITE_KEY
+    ENV VITE_API_URL=$VITE_API_URL
     
     WORKDIR /client
     
@@ -33,4 +35,6 @@
     
     EXPOSE 4000
     
-    CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node scripts/import-local-exercises.js && node src/index.js"]
+    # Không auto-migrate, không auto-seed.
+    # Migrate chạy thủ công qua Railway Run Command.
+    CMD ["node", "src/index.js"]
