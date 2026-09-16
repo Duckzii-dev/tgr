@@ -5,6 +5,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import authRoutes from './routes/auth.routes.js';
 import workoutRoutes from './routes/workout.routes.js';
@@ -18,29 +20,26 @@ import profileRoutes from './routes/profile.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { issueCsrfToken, verifyCsrf } from './middleware/csrf.middleware.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const PORT = process.env.PORT || 4000;
+const IS_PROD = process.env.NODE_ENV === 'production';
 
-// Trust proxy (Railway/Cloudflare) — phải đặt trước mọi middleware đọc req.ip
 app.set('trust proxy', 1);
 
-// Security headers
 app.use(helmet({ crossOriginResourcePolicy: false }));
-
-// CORS — dùng CLIENT_URL, mặc định localhost dev
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: IS_PROD ? false : process.env.CLIENT_URL || 'http://localhost:5173',
     credentials: true,
   })
 );
-
-// Body + cookie + log
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
-// Global rate limit: 300 req / phút / IP
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
@@ -48,23 +47,15 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) =>
-    req.headers['cf-connecting-ip'] ||
-    req.headers['x-real-ip'] ||
-    req.ip,
+    req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.ip,
 });
-
 app.use('/api', globalLimiter);
 
-// CSRF token issue (cho mọi request — set cookie nếu chưa có)
 app.use(issueCsrfToken);
 
-// Health check
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// Auth routes — KHÔNG cần CSRF (login/register chưa có session)
 app.use('/api/auth', authRoutes);
-
-// Các route state-changing — verify CSRF
 app.use('/api/workouts', verifyCsrf, workoutRoutes);
 app.use('/api/exercises', verifyCsrf, exerciseRoutes);
 app.use('/api/bodyweight', verifyCsrf, bodyWeightRoutes);
@@ -74,8 +65,18 @@ app.use('/api/analytics', verifyCsrf, analyticsRoutes);
 app.use('/api/goals', verifyCsrf, goalRoutes);
 app.use('/api/profile', verifyCsrf, profileRoutes);
 
+// ---------- Serve frontend static ----------
+const clientDist = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDist));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`[tgr] server listening on :${PORT}`);
+  console.log(`[tgr] serving client from ${clientDist}`);
 });

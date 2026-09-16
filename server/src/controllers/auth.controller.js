@@ -9,7 +9,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: IS_PROD,
-  sameSite: IS_PROD ? 'none' : 'lax',
+  sameSite: 'lax',
   maxAge: 1000 * 60 * 60 * 24 * 30,
   path: '/',
 };
@@ -57,14 +57,12 @@ export async function logout(_req, res) {
   res.json({ ok: true });
 }
 
-/* ---------- Google OAuth ---------- */
-
 export function googleStart(req, res) {
   const state = crypto.randomBytes(16).toString('hex');
   res.cookie('oauth_state', state, {
     httpOnly: true,
     secure: IS_PROD,
-    sameSite: IS_PROD ? 'none' : 'lax',   // ← sửa
+    sameSite: 'lax',
     maxAge: 1000 * 60 * 10,
     path: '/',
   });
@@ -129,7 +127,8 @@ export async function googleCallback(req, res) {
 
   const token = signToken(user);
   res.cookie('token', token, COOKIE_OPTS);
-  res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/auth/callback`);
+  const base = process.env.CLIENT_URL || 'http://localhost:5173';
+  res.redirect(`${base}/auth/callback`);
 }
 
 export async function unlinkGoogle(req, res) {

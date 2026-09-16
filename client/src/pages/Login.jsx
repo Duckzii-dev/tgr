@@ -6,7 +6,8 @@ import { useToast } from '../lib/toast.jsx';
 import { api } from '../lib/api.js';
 import { Chrome } from 'lucide-react';
 
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+const TURNSTILE_SITE_KEY = '0x4AAAAAAE2XR-eReF1YEGAE';
+
 
 export default function Login() {
   const { login } = useAuth();
@@ -40,7 +41,7 @@ export default function Login() {
   };
 
   const google = () => {
-    window.location.href = `${api.BASE}/auth/google`;
+    window.location.href = '/api/auth/google';
   };
 
   return (

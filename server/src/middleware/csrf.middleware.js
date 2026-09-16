@@ -1,4 +1,3 @@
-
 import crypto from 'crypto';
 
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
@@ -14,7 +13,7 @@ export function issueCsrfToken(req, res, next) {
     res.cookie(CSRF_COOKIE, token, {
       httpOnly: false,
       secure: IS_PROD,
-      sameSite: IS_PROD ? 'none' : 'lax',
+      sameSite: 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30,
       path: '/',
     });
