@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Dumbbell, Activity, LineChart, Trophy, Target,
-  User, Settings, LogOut, Menu, X,
+  User, Settings, LogOut, Menu, X, Library,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },
   { to: '/exercises', label: 'Exercises', icon: Activity },
+  { to: '/import-exercises', label: 'Library', icon: Library },
   { to: '/progress', label: 'Progress', icon: LineChart },
   { to: '/analytics', label: 'Analytics', icon: Activity },
   { to: '/prs', label: 'PRs', icon: Trophy },
@@ -23,7 +24,7 @@ const MOBILE = [
   { to: '/', label: 'Home', icon: LayoutDashboard },
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts/new', label: 'Workout', icon: Dumbbell },
-  { to: '/progress', label: 'Progress', icon: LineChart },
+  { to: '/import-exercises', label: 'Library', icon: Library },
   { to: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -45,7 +46,7 @@ export default function Layout({ children }) {
             TGR<span className="text-accent">.</span>PROGRESS
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {NAV.map((n) => (
             <NavLink
               key={n.to}
@@ -88,7 +89,7 @@ export default function Layout({ children }) {
             onClick={() => setOpen(false)}
           >
             <div
-              className="w-64 bg-ink-900 h-full p-4"
+              className="w-64 bg-ink-900 h-full p-4 overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between mb-4">

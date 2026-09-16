@@ -17,6 +17,10 @@ import PRs from './pages/PRs.jsx';
 import Goals from './pages/Goals.jsx';
 import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
+import ImportExercises from './pages/ImportExercises.jsx';
+
+// ...
+
 
 const P = ({ children }) => (
   <ProtectedRoute>
@@ -30,7 +34,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-
+      <Route path="/import-exercises" element={<P><ImportExercises /></P>} />
       <Route path="/" element={<P><Dashboard /></P>} />
       <Route path="/calendar" element={<P><CalendarPage /></P>} />
       <Route path="/workouts" element={<P><Workouts /></P>} />
