@@ -27,9 +27,10 @@
     
     COPY server/src ./src
     COPY server/public ./public
+    COPY server/scripts ./scripts
     
     COPY --from=client-builder /client/dist /client/dist
     
     EXPOSE 4000
     
-    CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]
+    CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node scripts/import-local-exercises.js && node src/index.js"]
