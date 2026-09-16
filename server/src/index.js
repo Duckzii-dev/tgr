@@ -17,8 +17,10 @@ import calendarRoutes from './routes/calendar.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import goalRoutes from './routes/goal.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { issueCsrfToken, verifyCsrf } from './middleware/csrf.middleware.js';
+import { ipBlockGuard, getClientIp } from './middleware/ipblock.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,24 +31,15 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
 
-// ---- Security headers ----
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://challenges.cloudflare.com",
-        ],
-        frameSrc: ["'self'", "https://challenges.cloudflare.com"],
-        connectSrc: [
-          "'self'",
-          "https://challenges.cloudflare.com",
-          "https://*.cloudflare.com",
-        ],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        frameSrc: ["'self'"],
+        connectSrc: ["'self'"],
         imgSrc: ["'self'", "data:", "https:"],
         mediaSrc: ["'self'", "data:", "blob:", "https:"],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -59,7 +52,6 @@ app.use(
   })
 );
 
-// ---- CORS (dev only) ----
 app.use(
   cors({
     origin: IS_PROD ? false : process.env.CLIENT_URL || 'http://localhost:5173',
@@ -71,7 +63,6 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
-// ---- Serve public assets (videos, images) ----
 app.use(
   '/static',
   express.static(path.join(__dirname, '../public'), {
@@ -82,26 +73,25 @@ app.use(
   })
 );
 
-// ---- Global rate limit ----
+// IP block guard — chạy TRƯỚC rate limit và mọi route /api/*
+app.use('/api', ipBlockGuard);
+
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
   message: { error: 'Too many requests. Slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) =>
-    req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.ip,
+  keyGenerator: getClientIp,
 });
 app.use('/api', globalLimiter);
 
-// ---- CSRF issue ----
 app.use(issueCsrfToken);
 
-// ---- Health ----
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// ---- API routes ----
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', verifyCsrf, adminRoutes);
 app.use('/api/workouts', verifyCsrf, workoutRoutes);
 app.use('/api/exercises', verifyCsrf, exerciseRoutes);
 app.use('/api/bodyweight', verifyCsrf, bodyWeightRoutes);
@@ -111,11 +101,9 @@ app.use('/api/analytics', verifyCsrf, analyticsRoutes);
 app.use('/api/goals', verifyCsrf, goalRoutes);
 app.use('/api/profile', verifyCsrf, profileRoutes);
 
-// ---- Serve frontend static ----
 const clientDist = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
 
-// ---- SPA fallback ----
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(clientDist, 'index.html'));
@@ -126,5 +114,4 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`[tgr] server listening on :${PORT}`);
   console.log(`[tgr] serving client from ${clientDist}`);
-  console.log(`[tgr] serving static from ${path.join(__dirname, '../public')}`);
 });

@@ -74,11 +74,45 @@ async function main() {
   }
   console.log(`✅ ${EXERCISES.length} exercises ready.`);
 
+  // ---- Admin user ----
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (adminEmail && adminPassword) {
+    const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (existing) {
+      if (existing.role !== 'admin') {
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { role: 'admin' },
+        });
+        console.log(`✅ Promoted ${adminEmail} to admin.`);
+      } else {
+        console.log(`Admin ${adminEmail} already exists.`);
+      }
+    } else {
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
+      await prisma.user.create({
+        data: {
+          email: adminEmail,
+          passwordHash,
+          name: 'Admin',
+          emailVerified: true,
+          role: 'admin',
+        },
+      });
+      console.log(`✅ Created admin: ${adminEmail}`);
+    }
+  } else {
+    console.log('ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin creation.');
+  }
+
+  // ---- Demo user ----
   const email = process.env.SEED_EMAIL;
   const password = process.env.SEED_PASSWORD;
 
   if (!email || !password) {
-    console.log('SEED_EMAIL / SEED_PASSWORD not set — skipping user creation.');
+    console.log('SEED_EMAIL / SEED_PASSWORD not set — skipping demo user.');
     return;
   }
 
@@ -88,7 +122,7 @@ async function main() {
     return;
   }
 
-  console.log(`Creating user: ${email}`);
+  console.log(`Creating demo user: ${email}`);
   const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.create({
     data: {
@@ -96,10 +130,10 @@ async function main() {
       passwordHash,
       name: email.split('@')[0],
       emailVerified: true,
+      role: 'user',
     },
   });
   console.log(`✅ Created user: ${email}`);
-  console.log('🎉 Seed complete.');
 }
 
 main()

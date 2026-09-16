@@ -18,12 +18,17 @@ import Goals from './pages/Goals.jsx';
 import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
 import ImportExercises from './pages/ImportExercises.jsx';
-
-// ...
-
+import Admin from './pages/Admin.jsx';
+import AdminUserDetail from './pages/AdminUserDetail.jsx';
 
 const P = ({ children }) => (
   <ProtectedRoute>
+    <Layout>{children}</Layout>
+  </ProtectedRoute>
+);
+
+const A = ({ children }) => (
+  <ProtectedRoute adminOnly>
     <Layout>{children}</Layout>
   </ProtectedRoute>
 );
@@ -48,6 +53,10 @@ export default function App() {
       <Route path="/goals" element={<P><Goals /></P>} />
       <Route path="/profile" element={<P><Profile /></P>} />
       <Route path="/settings" element={<P><Settings /></P>} />
+
+      {/* Admin */}
+      <Route path="/admin" element={<A><Admin /></A>} />
+      <Route path="/admin/users/:id" element={<A><AdminUserDetail /></A>} />
     </Routes>
   );
 }

@@ -23,21 +23,12 @@ export function AuthProvider({ children }) {
   }, [refresh]);
 
   const login = async (email, password, turnstileToken) => {
-    const { user } = await api.post('/auth/login', {
-      email,
-      password,
-      turnstileToken,
-    });
+    const { user } = await api.post('/auth/login', { email, password, turnstileToken });
     setUser(user);
   };
 
   const register = async (email, password, name, turnstileToken) => {
-    const { user } = await api.post('/auth/register', {
-      email,
-      password,
-      name,
-      turnstileToken,
-    });
+    const { user } = await api.post('/auth/register', { email, password, name, turnstileToken });
     setUser(user);
   };
 
@@ -48,7 +39,16 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthCtx.Provider
-      value={{ user, loading, login, register, logout, refresh, setUser }}
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refresh,
+        setUser,
+        isAdmin: user?.role === 'admin',
+      }}
     >
       {children}
     </AuthCtx.Provider>

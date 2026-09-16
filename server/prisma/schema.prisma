@@ -16,6 +16,12 @@ model User {
   emailVerified Boolean  @default(false)
   avatarUrl     String?
   timezone      String   @default("UTC")
+  role          String   @default("user")   // 'user' | 'admin'
+  isBanned      Boolean  @default(false)
+  bannedAt      DateTime?
+  bannedReason  String?  @db.Text
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -25,9 +31,13 @@ model User {
   goals             Goal[]
   personalRecords   PersonalRecord[]
   exercises         Exercise[]
+  auditLogs         AuditLog[]        @relation("AuditActor")
+  auditTargets      AuditLog[]        @relation("AuditTarget")
 
   @@index([email])
   @@index([googleId])
+  @@index([role])
+  @@index([isBanned])
 }
 
 model Exercise {
@@ -81,6 +91,7 @@ model Workout {
 
   user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   exercises WorkoutExercise[]
+  prs       PersonalRecord[]
 
   @@index([userId])
   @@index([date])
@@ -175,19 +186,58 @@ model PersonalRecord {
   id         String   @id @default(cuid())
   userId     String
   exerciseId String
+  workoutId  String?
   type       String
   value      Float
   reps       Int?
   weight     Float?
   achievedAt DateTime
-  workoutId  String?
   createdAt  DateTime @default(now())
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  workout  Workout? @relation(fields: [workoutId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, exerciseId, type])
   @@index([userId])
   @@index([exerciseId])
   @@index([achievedAt])
-  @@index([userId, exerciseId, type])
+  @@index([workoutId])
+}
+
+// ============================================================
+// ADMIN MODELS
+// ============================================================
+
+model IpBlock {
+  id        String   @id @default(cuid())
+  ip        String   @unique
+  reason    String?  @db.Text
+  createdBy String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  @@index([ip])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String?
+  action     String   // 'user.ban', 'user.delete', 'ip.block', ...
+  targetType String?  // 'User', 'IpBlock', 'Workout'
+  targetId   String?
+  meta       Json?
+  ip         String?
+  userAgent  String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  actor  User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  target User? @relation("AuditTarget", fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([targetId])
+  @@index([action])
+  @@index([createdAt])
 }

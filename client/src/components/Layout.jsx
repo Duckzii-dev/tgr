@@ -1,12 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Dumbbell, Activity, LineChart, Trophy, Target,
-  User, Settings, LogOut, Menu, X, Library,
+  User, Settings, LogOut, Menu, X, Library, Shield,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 
-const NAV = [
+const BASE_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },
@@ -30,8 +30,12 @@ const MOBILE = [
 
 export default function Layout({ children }) {
   const [open, setOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const nav = useNavigate();
+
+  const NAV = isAdmin
+    ? [...BASE_NAV, { to: '/admin', label: 'Admin', icon: Shield }]
+    : BASE_NAV;
 
   const doLogout = async () => {
     await logout();

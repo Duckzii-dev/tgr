@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../utils/prisma.js';
 import { httpError } from '../middleware/error.middleware.js';
+import { getClientIp } from '../middleware/ipblock.middleware.js';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -19,7 +20,13 @@ function signToken(user) {
 }
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, name: u.name, avatarUrl: u.avatarUrl };
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    avatarUrl: u.avatarUrl,
+    role: u.role || 'user',
+  };
 }
 
 export async function register(req, res) {
@@ -29,8 +36,15 @@ export async function register(req, res) {
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) throw httpError(409, 'Email already registered');
   const passwordHash = await bcrypt.hash(password, 12);
+  const ip = getClientIp(req);
   const user = await prisma.user.create({
-    data: { email, passwordHash, name: name || email.split('@')[0] },
+    data: {
+      email,
+      passwordHash,
+      name: name || email.split('@')[0],
+      lastLoginAt: new Date(),
+      lastLoginIp: ip,
+    },
   });
   const token = signToken(user);
   res.cookie('token', token, COOKIE_OPTS);
@@ -41,8 +55,20 @@ export async function login(req, res) {
   const { email, password } = req.body;
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.passwordHash) throw httpError(401, 'Invalid credentials');
+  if (user.isBanned)
+    throw httpError(403, user.bannedReason
+      ? `Account banned: ${user.bannedReason}`
+      : 'Account banned');
+
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw httpError(401, 'Invalid credentials');
+
+  const ip = getClientIp(req);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date(), lastLoginIp: ip },
+  });
+
   const token = signToken(user);
   res.cookie('token', token, COOKIE_OPTS);
   res.json({ user: publicUser(user), token });
@@ -107,6 +133,8 @@ export async function googleCallback(req, res) {
   const { sub: googleId, email, name, picture, email_verified } = info;
   if (!email) throw httpError(400, 'Google account has no email');
 
+  const ip = getClientIp(req);
+
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     user = await prisma.user.create({
@@ -116,12 +144,25 @@ export async function googleCallback(req, res) {
         googleId,
         emailVerified: !!email_verified,
         avatarUrl: picture,
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
       },
     });
-  } else if (!user.googleId) {
+  } else {
+    if (user.isBanned)
+      throw httpError(403, user.bannedReason
+        ? `Account banned: ${user.bannedReason}`
+        : 'Account banned');
+
     user = await prisma.user.update({
       where: { id: user.id },
-      data: { googleId, avatarUrl: user.avatarUrl || picture, emailVerified: true },
+      data: {
+        googleId: user.googleId || googleId,
+        avatarUrl: user.avatarUrl || picture,
+        emailVerified: true,
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
+      },
     });
   }
 
