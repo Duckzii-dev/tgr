@@ -38,6 +38,22 @@ model Exercise {
   userId      String?
   createdAt   DateTime @default(now())
 
+  externalId         String?  @unique
+  imageUrl           String?
+  imageUrls          Json?
+  videoUrl           String?
+  bodyParts          Json?
+  targetMuscles      Json?
+  secondaryMuscles   Json?
+  equipments         Json?
+  exerciseType       String?
+  overview           String?  @db.Text
+  instructions       Json?
+  exerciseTips       Json?
+  variations         Json?
+  keywords           Json?
+  relatedExerciseIds Json?
+
   user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutExercises WorkoutExercise[]
   personalRecords  PersonalRecord[]
@@ -45,6 +61,7 @@ model Exercise {
   @@unique([userId, name])
   @@index([userId])
   @@index([muscleGroup])
+  @@index([externalId])
 }
 
 model Workout {

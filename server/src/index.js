@@ -29,7 +29,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
 
-// ---- Security headers (1 lần, có CSP cho Turnstile) ----
+// ---- Security headers ----
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
@@ -48,6 +48,7 @@ app.use(
           "https://*.cloudflare.com",
         ],
         imgSrc: ["'self'", "data:", "https:"],
+        mediaSrc: ["'self'", "data:", "blob:", "https:"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         fontSrc: ["'self'", "data:", "https:"],
         objectSrc: ["'none'"],
@@ -58,7 +59,7 @@ app.use(
   })
 );
 
-// ---- CORS (dev only, prod cùng origin không cần) ----
+// ---- CORS (dev only) ----
 app.use(
   cors({
     origin: IS_PROD ? false : process.env.CLIENT_URL || 'http://localhost:5173',
@@ -69,6 +70,17 @@ app.use(
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
+
+// ---- Serve public assets (videos, images) ----
+app.use(
+  '/static',
+  express.static(path.join(__dirname, '../public'), {
+    maxAge: '7d',
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
 
 // ---- Global rate limit ----
 const globalLimiter = rateLimit({
@@ -103,7 +115,7 @@ app.use('/api/profile', verifyCsrf, profileRoutes);
 const clientDist = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
 
-// SPA fallback — mọi route không phải /api trả index.html
+// ---- SPA fallback ----
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(clientDist, 'index.html'));
@@ -114,4 +126,5 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`[tgr] server listening on :${PORT}`);
   console.log(`[tgr] serving client from ${clientDist}`);
+  console.log(`[tgr] serving static from ${path.join(__dirname, '../public')}`);
 });

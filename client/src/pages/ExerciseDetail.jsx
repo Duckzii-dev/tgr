@@ -68,8 +68,69 @@ export default function ExerciseDetail() {
         <h1 className="text-2xl font-semibold">{exercise.name}</h1>
         <div className="text-sm text-ink-400 capitalize">
           {exercise.muscleGroup} · {exercise.equipment || '—'}
+          {exercise.exerciseType ? ` · ${exercise.exerciseType}` : ''}
         </div>
+        {exercise.overview && (
+          <p className="text-sm text-ink-300 mt-3">{exercise.overview}</p>
+        )}
       </div>
+
+      {exercise.videoUrl && (
+        <div className="card p-0 overflow-hidden">
+          <video
+            src={exercise.videoUrl}
+            controls
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full max-h-[600px] bg-black"
+          />
+        </div>
+      )}
+
+      {!exercise.videoUrl && exercise.imageUrl && (
+        <div className="card p-0 overflow-hidden">
+          <img
+            src={exercise.imageUrl}
+            alt={exercise.name}
+            className="w-full max-h-[500px] object-cover bg-ink-800"
+          />
+        </div>
+      )}
+
+      {Array.isArray(exercise.instructions) && exercise.instructions.length > 0 && (
+        <div className="card p-4">
+          <div className="font-semibold mb-2">Cách thực hiện</div>
+          <ol className="list-decimal ml-5 text-sm text-ink-300 space-y-1">
+            {exercise.instructions.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {Array.isArray(exercise.exerciseTips) && exercise.exerciseTips.length > 0 && (
+        <div className="card p-4">
+          <div className="font-semibold mb-2">Tips</div>
+          <ul className="list-disc ml-5 text-sm text-ink-300 space-y-1">
+            {exercise.exerciseTips.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {Array.isArray(exercise.variations) && exercise.variations.length > 0 && (
+        <div className="card p-4">
+          <div className="font-semibold mb-2">Biến thể</div>
+          <ul className="list-disc ml-5 text-sm text-ink-300 space-y-1">
+            {exercise.variations.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Current Best" value={`${stats.currentBest}kg`} />
@@ -88,7 +149,9 @@ export default function ExerciseDetail() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm whitespace-nowrap ${
-              tab === t ? 'text-accent border-b-2 border-accent' : 'text-ink-400 hover:text-white'
+              tab === t
+                ? 'text-accent border-b-2 border-accent'
+                : 'text-ink-400 hover:text-white'
             }`}
           >
             {t}
@@ -153,7 +216,9 @@ export default function ExerciseDetail() {
                     <div key={set.id}>
                       {i + 1}. {set.weight}kg × {set.reps}
                       {set.rir != null ? ` (RIR ${set.rir})` : ''}
-                      {set.estimated1RM ? ` · ${set.estimated1RM.toFixed(1)} 1RM` : ''}
+                      {set.estimated1RM
+                        ? ` · ${set.estimated1RM.toFixed(1)} 1RM`
+                        : ''}
                     </div>
                   ))}
                 </div>
@@ -181,13 +246,17 @@ export default function ExerciseDetail() {
             {prs.map((p) => (
               <div key={p.id} className="card p-3 flex items-center justify-between">
                 <div>
-                  <div className="text-sm capitalize">{p.type.replace('_', ' ')}</div>
+                  <div className="text-sm capitalize">
+                    {p.type.replace('_', ' ')}
+                  </div>
                   <div className="text-xs text-ink-400">
                     {fmtDate(p.achievedAt)}
                     {p.reps ? ` · ${p.weight}kg × ${p.reps}` : ''}
                   </div>
                 </div>
-                <div className="text-accent font-semibold">{fmtNumber(p.value, 1)}</div>
+                <div className="text-accent font-semibold">
+                  {fmtNumber(p.value, 1)}
+                </div>
               </div>
             ))}
           </div>
