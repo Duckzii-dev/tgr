@@ -29,17 +29,48 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
 
-app.use(helmet({ crossOriginResourcePolicy: false }));
+// ---- Security headers (1 lần, có CSP cho Turnstile) ----
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://challenges.cloudflare.com",
+        ],
+        frameSrc: ["'self'", "https://challenges.cloudflare.com"],
+        connectSrc: [
+          "'self'",
+          "https://challenges.cloudflare.com",
+          "https://*.cloudflare.com",
+        ],
+        imgSrc: ["'self'", "data:", "https:"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'", "data:", "https:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  })
+);
+
+// ---- CORS (dev only, prod cùng origin không cần) ----
 app.use(
   cors({
     origin: IS_PROD ? false : process.env.CLIENT_URL || 'http://localhost:5173',
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
+// ---- Global rate limit ----
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
@@ -51,10 +82,13 @@ const globalLimiter = rateLimit({
 });
 app.use('/api', globalLimiter);
 
+// ---- CSRF issue ----
 app.use(issueCsrfToken);
 
+// ---- Health ----
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
+// ---- API routes ----
 app.use('/api/auth', authRoutes);
 app.use('/api/workouts', verifyCsrf, workoutRoutes);
 app.use('/api/exercises', verifyCsrf, exerciseRoutes);
@@ -65,10 +99,11 @@ app.use('/api/analytics', verifyCsrf, analyticsRoutes);
 app.use('/api/goals', verifyCsrf, goalRoutes);
 app.use('/api/profile', verifyCsrf, profileRoutes);
 
-// ---------- Serve frontend static ----------
+// ---- Serve frontend static ----
 const clientDist = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
 
+// SPA fallback — mọi route không phải /api trả index.html
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(clientDist, 'index.html'));
