@@ -35,6 +35,5 @@
     
     EXPOSE 4000
     
-    # Không auto-migrate, không auto-seed.
-    # Migrate chạy thủ công qua Railway Run Command.
-    CMD ["node", "src/index.js"]
+    # Auto-migrate trước khi start. Idempotent — chạy nhiều lần vẫn OK.
+    CMD ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]
