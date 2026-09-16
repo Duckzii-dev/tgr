@@ -64,7 +64,6 @@ export async function listWorkouts(req, res) {
       date: w.date,
       workoutType: w.workoutType,
       duration: w.duration,
-      notes: w.notes,
       ...stats,
     };
   });
@@ -150,7 +149,6 @@ export async function finishWorkout(req, res) {
   let duration = workout.duration;
 
   if (!isBackfill && !workout.startTime) {
-    // Workout chưa finish lần nào — set start/end bằng createdAt/now
     const startTime = workout.createdAt;
     duration = durationSeconds(startTime, endTime);
     await prisma.workout.update({
@@ -158,14 +156,12 @@ export async function finishWorkout(req, res) {
       data: { endTime, startTime, duration },
     });
   } else if (!isBackfill && workout.startTime && !workout.endTime) {
-    // Có startTime nhưng chưa có endTime — finish bình thường
     duration = durationSeconds(workout.startTime, endTime);
     await prisma.workout.update({
       where: { id },
       data: { endTime, duration },
     });
   }
-  // Nếu isBackfill → giữ nguyên duration đã set, không đụng start/end
 
   let totalSets = 0;
   let totalReps = 0;
@@ -234,6 +230,50 @@ export async function removeExercise(req, res) {
   });
   if (!we) throw httpError(404, 'Not found');
   await prisma.workoutExercise.delete({ where: { id: weId } });
+  res.json({ ok: true });
+}
+
+export async function reorderExercises(req, res) {
+  const userId = req.user.id;
+  const { id } = req.params;
+  const { order } = req.body;
+  if (!Array.isArray(order)) throw httpError(400, 'order must be an array');
+
+  const workout = await prisma.workout.findFirst({ where: { id, userId } });
+  if (!workout) throw httpError(404, 'Workout not found');
+
+  await prisma.$transaction(
+    order.map((o) =>
+      prisma.workoutExercise.update({
+        where: { id: o.id },
+        data: { order: Number(o.order) },
+      })
+    )
+  );
+
+  res.json({ ok: true });
+}
+
+export async function reorderSets(req, res) {
+  const userId = req.user.id;
+  const { weId } = req.params;
+  const { order } = req.body;
+  if (!Array.isArray(order)) throw httpError(400, 'order must be an array');
+
+  const we = await prisma.workoutExercise.findFirst({
+    where: { id: weId, workout: { userId } },
+  });
+  if (!we) throw httpError(404, 'Workout exercise not found');
+
+  await prisma.$transaction(
+    order.map((o) =>
+      prisma.workoutSet.update({
+        where: { id: o.id },
+        data: { setNumber: Number(o.setNumber) },
+      })
+    )
+  );
+
   res.json({ ok: true });
 }
 

@@ -12,6 +12,7 @@ r.post('/', asyncHandler(c.createWorkout));
 r.post('/bulk-delete', asyncHandler(c.bulkDeleteWorkouts));
 r.get('/previous/:exerciseId', asyncHandler(c.previousSession));
 r.post('/exercises/:weId/sets', asyncHandler(c.addSet));
+r.put('/exercises/:weId/reorder-sets', asyncHandler(c.reorderSets));
 r.put('/sets/:setId', asyncHandler(c.updateSet));
 r.delete('/sets/:setId', asyncHandler(c.deleteSet));
 r.post('/exercises/:weId/duplicate-previous', asyncHandler(c.duplicatePrevious));
@@ -21,6 +22,7 @@ r.put('/:id', asyncHandler(c.updateWorkout));
 r.delete('/:id', asyncHandler(c.deleteWorkout));
 r.post('/:id/finish', asyncHandler(c.finishWorkout));
 r.post('/:id/exercises', asyncHandler(c.addExercise));
+r.put('/:id/reorder-exercises', asyncHandler(c.reorderExercises));
 r.delete('/:id/exercises/:weId', asyncHandler(c.removeExercise));
 
 export default r;

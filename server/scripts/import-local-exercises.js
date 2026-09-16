@@ -11,7 +11,67 @@ const prisma = new PrismaClient();
 const JSON_FILE = path.join(__dirname, '..', 'public', 'exercises.json');
 const VIDEOS_DIR = path.join(__dirname, '..', 'public', 'videos');
 
-const BODY_PART_MAP = {
+const TARGET_MUSCLE_MAP = {
+  // chest
+  'pectoralis major clavicular head': 'upper chest',
+  'pectoralis major sternal head': 'mid chest',
+  'pectoralis major': 'chest',
+  'pectoralis minor': 'chest',
+  // back
+  'latissimus dorsi': 'lats',
+  'trapezius upper fibers': 'upper traps',
+  'trapezius middle fibers': 'mid traps',
+  'trapezius lower fibers': 'lower traps',
+  'trapezius': 'traps',
+  'rhomboids': 'rhomboids',
+  'teres major': 'teres major',
+  'teres minor': 'teres minor',
+  'erector spinae': 'lower back',
+  'infraspinatus': 'rotator cuff',
+  'subscapularis': 'rotator cuff',
+  // shoulders
+  'anterior deltoid': 'front delts',
+  'lateral deltoid': 'side delts',
+  'posterior deltoid': 'rear delts',
+  'deltoid': 'shoulders',
+  'supraspinatus': 'rotator cuff',
+  // arms
+  'biceps brachii': 'biceps',
+  'brachialis': 'brachialis',
+  'brachioradialis': 'brachioradialis',
+  'triceps brachii': 'triceps',
+  'wrist flexors': 'forearms',
+  'wrist extensors': 'forearms',
+  // legs
+  'quadriceps': 'quads',
+  'hamstrings': 'hamstrings',
+  'gluteus maximus': 'glutes',
+  'gluteus medius': 'glutes',
+  'gluteus minimus': 'glutes',
+  'gastrocnemius': 'calves',
+  'soleus': 'calves',
+  'adductor longus': 'adductors',
+  'adductor brevis': 'adductors',
+  'adductor magnus': 'adductors',
+  'tensor fasciae latae': 'abductors',
+  'hip flexors': 'hip flexors',
+  'iliopsoas': 'hip flexors',
+  'sartorius': 'legs',
+  'popliteus': 'legs',
+  'tibialis anterior': 'calves',
+  // core
+  'rectus abdominis': 'abs',
+  'obliques': 'obliques',
+  'transversus abdominis': 'deep core',
+  // misc
+  'sternocleidomastoid': 'neck',
+  'levator scapulae': 'upper traps',
+  'splenius': 'neck',
+  'serratus anterior': 'core',
+  'serratus ante': 'core',
+};
+
+const BODY_PART_FALLBACK = {
   chest: 'chest',
   back: 'back',
   shoulders: 'shoulders',
@@ -22,12 +82,14 @@ const BODY_PART_MAP = {
   'lower legs': 'legs',
   hips: 'legs',
   cardio: 'cardio',
-  neck: 'shoulders',
+  neck: 'neck',
 };
 
 function mapMuscleGroup(bodyPart, target) {
-  const bp = (bodyPart || '').toLowerCase();
-  const t = (target || '').toLowerCase();
+  const t = (target || '').toLowerCase().trim();
+  if (TARGET_MUSCLE_MAP[t]) return TARGET_MUSCLE_MAP[t];
+
+  const bp = (bodyPart || '').toLowerCase().trim();
   if (bp === 'upper arms') {
     if (t.includes('bicep')) return 'biceps';
     if (t.includes('tricep')) return 'triceps';
@@ -35,9 +97,9 @@ function mapMuscleGroup(bodyPart, target) {
   }
   if (bp === 'lower arms') {
     if (t.includes('bicep')) return 'biceps';
-    return 'triceps';
+    return 'forearms';
   }
-  return BODY_PART_MAP[bp] || 'other';
+  return BODY_PART_FALLBACK[bp] || 'other';
 }
 
 async function main() {
