@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Copy, Timer, Check } from 'lucide-react';
+import { Plus, Trash2, Copy, Timer, Check, Search } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
@@ -18,18 +18,36 @@ export default function WorkoutDetail() {
   const { data, loading, refresh } = useFetch(() => api.get(`/workouts/${id}`), [id]);
   const [addOpen, setAddOpen] = useState(false);
   const [exercises, setExercises] = useState([]);
+  const [search, setSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [deleteSet, setDeleteSet] = useState(null);
   const [deleteEx, setDeleteEx] = useState(null);
   const [summary, setSummary] = useState(null);
 
-  const openAdd = async () => {
+  const openAdd = () => {
     setAddOpen(true);
-    try {
-      const res = await api.get('/exercises');
-      setExercises(res.exercises);
-    } catch {}
+    setSearch('');
+    setMuscleFilter('');
   };
+
+  useEffect(() => {
+    if (!addOpen) return;
+    const t = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const p = new URLSearchParams();
+        if (search) p.set('q', search);
+        if (muscleFilter) p.set('muscleGroup', muscleFilter);
+        p.set('limit', '60');
+        const res = await api.get(`/exercises?${p}`);
+        setExercises(res.exercises || []);
+      } catch {}
+      finally { setSearchLoading(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search, muscleFilter, addOpen]);
 
   const addExercise = async (exerciseId) => {
     try {
@@ -60,21 +78,13 @@ export default function WorkoutDetail() {
   };
 
   const doDeleteSet = async () => {
-    try {
-      await api.del(`/workouts/sets/${deleteSet}`);
-      refresh();
-    } catch (e) {
-      toast(e.message, 'error');
-    }
+    try { await api.del(`/workouts/sets/${deleteSet}`); refresh(); }
+    catch (e) { toast(e.message, 'error'); }
   };
 
   const doDeleteEx = async () => {
-    try {
-      await api.del(`/workouts/${id}/exercises/${deleteEx}`);
-      refresh();
-    } catch (e) {
-      toast(e.message, 'error');
-    }
+    try { await api.del(`/workouts/${id}/exercises/${deleteEx}`); refresh(); }
+    catch (e) { toast(e.message, 'error'); }
   };
 
   const dupPrev = async (weId) => {
@@ -82,9 +92,7 @@ export default function WorkoutDetail() {
       const res = await api.post(`/workouts/exercises/${weId}/duplicate-previous`);
       toast(`Copied ${res.created} sets`);
       refresh();
-    } catch (e) {
-      toast(e.message, 'error');
-    }
+    } catch (e) { toast(e.message, 'error'); }
   };
 
   const finish = async () => {
@@ -92,18 +100,12 @@ export default function WorkoutDetail() {
       const res = await api.post(`/workouts/${id}/finish`);
       setSummary(res.summary);
       refresh();
-    } catch (e) {
-      toast(e.message, 'error');
-    }
+    } catch (e) { toast(e.message, 'error'); }
   };
 
   const doDelete = async () => {
-    try {
-      await api.del(`/workouts/${id}`);
-      nav('/workouts');
-    } catch (e) {
-      toast(e.message, 'error');
-    }
+    try { await api.del(`/workouts/${id}`); nav('/workouts'); }
+    catch (e) { toast(e.message, 'error'); }
   };
 
   if (loading)
@@ -175,22 +177,78 @@ export default function WorkoutDetail() {
       ))}
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Exercise">
-        <div className="max-h-80 overflow-y-auto space-y-1">
-          {exercises.map((ex) => (
-            <button
-              key={ex.id}
-              onClick={() => addExercise(ex.id)}
-              className="w-full text-left p-2 rounded-lg hover:bg-ink-850 flex items-center justify-between"
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
+              <input
+                autoFocus
+                className="input pl-9"
+                placeholder="Tìm bài tập... (vd: bench, squat)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="input sm:w-40"
+              value={muscleFilter}
+              onChange={(e) => setMuscleFilter(e.target.value)}
             >
-              <div>
-                <div className="text-sm">{ex.name}</div>
-                <div className="text-xs text-ink-400 capitalize">
-                  {ex.muscleGroup} · {ex.equipment || '—'}
-                </div>
+              <option value="">Tất cả nhóm cơ</option>
+              <option value="chest">Chest</option>
+              <option value="back">Back</option>
+              <option value="shoulders">Shoulders</option>
+              <option value="biceps">Biceps</option>
+              <option value="triceps">Triceps</option>
+              <option value="legs">Legs</option>
+              <option value="core">Core</option>
+              <option value="cardio">Cardio</option>
+            </select>
+          </div>
+
+          <div className="max-h-80 overflow-y-auto space-y-1">
+            {searchLoading ? (
+              <div className="text-center text-sm text-ink-400 py-6">Đang tìm...</div>
+            ) : exercises.length === 0 ? (
+              <div className="text-center text-sm text-ink-400 py-6">
+                Không tìm thấy bài tập nào
               </div>
-              <Plus className="w-4 h-4 text-ink-400" />
-            </button>
-          ))}
+            ) : (
+              exercises.map((ex) => (
+                <button
+                  key={ex.id}
+                  onClick={() => addExercise(ex.id)}
+                  className="w-full text-left p-2 rounded-lg hover:bg-ink-850 flex items-center gap-3"
+                >
+                  {ex.videoUrl ? (
+                    <video
+                      src={ex.videoUrl}
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      className="w-12 h-12 rounded object-cover bg-ink-800 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded bg-ink-800 shrink-0 flex items-center justify-center text-[8px] text-ink-500">
+                      No img
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm truncate">{ex.name}</div>
+                    <div className="text-xs text-ink-400 capitalize truncate">
+                      {ex.muscleGroup} · {ex.equipment || '—'}
+                    </div>
+                  </div>
+                  <Plus className="w-4 h-4 text-ink-400 shrink-0" />
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="text-xs text-ink-500 text-center">
+            {exercises.length} bài tập · gõ để tìm kiếm
+          </div>
         </div>
       </Modal>
 
