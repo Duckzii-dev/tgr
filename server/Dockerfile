@@ -1,7 +1,3 @@
-# Railway rebuild
-cd ~/Code/tgr
-
-cat > server/Dockerfile <<'ENDOFFILE'
 # ---------- Stage 1: build client ----------
 FROM node:20-alpine AS client-builder
 
@@ -38,11 +34,3 @@ COPY --from=client-builder /client/dist /client/dist
 EXPOSE 4000
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]
-ENDOFFILE
-
-grep "COPY server/public" server/Dockerfile
-# phải in ra: COPY server/public ./public
-
-git add server/Dockerfile
-git commit -m "explicitly copy public and scripts"
-git push
