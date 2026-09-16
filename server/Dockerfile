@@ -26,6 +26,8 @@
     RUN npx prisma generate
     
     COPY server/src ./src
+    COPY server/public ./public
+    COPY server/scripts ./scripts
     
     COPY --from=client-builder /client/dist /client/dist
     
