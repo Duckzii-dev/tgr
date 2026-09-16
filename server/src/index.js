@@ -37,9 +37,17 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        frameSrc: ["'self'"],
-        connectSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://challenges.cloudflare.com",
+        ],
+        frameSrc: ["'self'", "https://challenges.cloudflare.com"],
+        connectSrc: [
+          "'self'",
+          "https://challenges.cloudflare.com",
+          "https://*.cloudflare.com",
+        ],
         imgSrc: ["'self'", "data:", "https:"],
         mediaSrc: ["'self'", "data:", "blob:", "https:"],
         styleSrc: ["'self'", "'unsafe-inline'"],
