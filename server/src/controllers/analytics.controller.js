@@ -1,5 +1,10 @@
 import { prisma } from '../utils/prisma.js';
-import { volume, isoWeek } from '../utils/calc.js';
+import {
+  volume,
+  dateKeyInTz,
+  yearMonthInTz,
+  isoWeekInTz,
+} from '../utils/calc.js';
 
 function rangeFrom(query) {
   const { from, to } = query;
@@ -9,9 +14,18 @@ function rangeFrom(query) {
   };
 }
 
+async function getUserTz(userId) {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  return u?.timezone || 'UTC';
+}
+
 export async function analyticsOverview(req, res) {
   const userId = req.user.id;
   const { from, to } = rangeFrom(req.query);
+  const tz = await getUserTz(userId);
 
   const workouts = await prisma.workout.findMany({
     where: { userId, date: { gte: from, lte: to } },
@@ -31,10 +45,11 @@ export async function analyticsOverview(req, res) {
   for (const w of workouts) {
     totalDuration += w.duration || 0;
 
-    const wk = isoWeek(w.date);
+    const wk = isoWeekInTz(w.date, tz);
     weekly[wk] = (weekly[wk] || 0) + (w.duration || 0);
 
-    const mk = new Date(w.date).toISOString().slice(0, 7);
+    const { year, month } = yearMonthInTz(w.date, tz);
+    const mk = `${year}-${String(month).padStart(2, '0')}`;
     monthly[mk] = (monthly[mk] || 0) + (w.duration || 0);
 
     for (const we of w.exercises) {
@@ -75,34 +90,46 @@ export async function analyticsOverview(req, res) {
 
 export async function streak(req, res) {
   const userId = req.user.id;
+  const tz = await getUserTz(userId);
   const workouts = await prisma.workout.findMany({
     where: { userId },
     select: { date: true },
     orderBy: { date: 'asc' },
   });
-  const dates = new Set(workouts.map((w) => new Date(w.date).toISOString().slice(0, 10)));
+  const dates = new Set(workouts.map((w) => dateKeyInTz(w.date, tz)));
 
+  // current: đếm lùi từ hôm nay (bỏ qua hôm nay nếu chưa tập)
   let current = 0;
-  const today = new Date();
-  for (let i = 0; i < 365; i++) {
+  const todayKey = dateKeyInTz(new Date(), tz);
+  const today = new Date(todayKey + 'T00:00:00Z');
+  for (let i = 0; i < 3650; i++) {
     const d = new Date(today);
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     const k = d.toISOString().slice(0, 10);
-    if (dates.has(k)) current++;
-    else if (i > 0) break;
+    if (dates.has(k)) {
+      current++;
+    } else if (i === 0) {
+      // hôm nay chưa tập → tiếp tục đếm từ hôm qua
+      continue;
+    } else {
+      break;
+    }
   }
 
+  // longest: duyệt toàn bộ dates đã sort
   let longest = 0;
-  let streak = 0;
+  let run = 0;
   let prev = null;
   const sorted = [...dates].sort();
   for (const k of sorted) {
     if (prev) {
       const diff = (new Date(k) - new Date(prev)) / 86400000;
-      streak = diff === 1 ? streak + 1 : 1;
-    } else streak = 1;
+      run = diff === 1 ? run + 1 : 1;
+    } else {
+      run = 1;
+    }
     prev = k;
-    if (streak > longest) longest = streak;
+    if (run > longest) longest = run;
   }
 
   res.json({ current, longest });

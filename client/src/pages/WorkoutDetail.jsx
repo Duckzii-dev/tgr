@@ -25,6 +25,7 @@ export default function WorkoutDetail() {
   const [deleteSet, setDeleteSet] = useState(null);
   const [deleteEx, setDeleteEx] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [finishing, setFinishing] = useState(false);
 
   const openAdd = () => {
     setAddOpen(true);
@@ -96,11 +97,14 @@ export default function WorkoutDetail() {
   };
 
   const finish = async () => {
+    if (finishing) return;
+    setFinishing(true);
     try {
       const res = await api.post(`/workouts/${id}/finish`);
       setSummary(res.summary);
       refresh();
     } catch (e) { toast(e.message, 'error'); }
+    finally { setFinishing(false); }
   };
 
   const doDelete = async () => {
@@ -117,6 +121,7 @@ export default function WorkoutDetail() {
     );
   if (!data?.workout) return <Empty title="Workout not found" />;
   const w = data.workout;
+  const isFinished = !!w.finishedAt;
 
   const totalVolume = w.exercises.reduce(
     (s, we) => s + we.sets.reduce((a, x) => a + x.weight * x.reps, 0),
@@ -141,8 +146,14 @@ export default function WorkoutDetail() {
           <button className="btn btn-ghost" onClick={openAdd}>
             <Plus className="w-4 h-4" /> Exercise
           </button>
-          <button className="btn btn-primary" onClick={finish}>
-            <Check className="w-4 h-4" /> Finish
+          <button
+            className="btn btn-primary"
+            onClick={finish}
+            disabled={finishing || isFinished}
+            title={isFinished ? 'Workout đã hoàn tất' : 'Finish workout'}
+          >
+            <Check className="w-4 h-4" />
+            {isFinished ? 'Finished' : finishing ? 'Finishing...' : 'Finish'}
           </button>
           <button className="btn btn-ghost" onClick={doDelete}>
             <Trash2 className="w-4 h-4" />

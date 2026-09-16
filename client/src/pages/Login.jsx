@@ -3,11 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
-import { api } from '../lib/api.js';
 import { Chrome } from 'lucide-react';
 
-const TURNSTILE_SITE_KEY = '0x4AAAAAAE2XR-eReF1YEGAE';
-
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 export default function Login() {
   const { login } = useAuth();
@@ -32,7 +30,6 @@ export default function Login() {
       nav('/');
     } catch (err) {
       toast(err.message, 'error');
-      // Token Turnstile chỉ dùng 1 lần → reset widget sau lỗi
       setTurnstileToken('');
       setTurnstileKey((k) => k + 1);
     } finally {

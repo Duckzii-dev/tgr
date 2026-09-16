@@ -3,9 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
-import { api } from '../lib/api.js';
 
-const TURNSTILE_SITE_KEY = '0x4AAAAAAE2XR-eReF1YEGAE';
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 export default function Register() {
   const { register } = useAuth();

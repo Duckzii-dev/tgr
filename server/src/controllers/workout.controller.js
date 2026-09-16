@@ -1,7 +1,12 @@
 import { prisma } from '../utils/prisma.js';
 import { httpError } from '../middleware/error.middleware.js';
 import { volume, epley1RM, durationSeconds } from '../utils/calc.js';
-import { evaluatePRs } from '../services/pr.service.js';
+import {
+  evaluatePRs,
+  persistPRs,
+  clearPRsForWorkout,
+  rebuildAllPRs,
+} from '../services/pr.service.js';
 
 export async function listWorkouts(req, res) {
   const userId = req.user.id;
@@ -36,13 +41,16 @@ export async function listWorkouts(req, res) {
   if (hasPR === 'true') {
     const prs = await prisma.personalRecord.findMany({
       where: { userId },
-      select: { achievedAt: true },
+      select: { workoutId: true, achievedAt: true },
     });
+    const ids = new Set(prs.map((p) => p.workoutId).filter(Boolean));
     const dates = new Set(
       prs.map((p) => new Date(p.achievedAt).toISOString().slice(0, 10))
     );
-    filtered = filtered.filter((w) =>
-      dates.has(new Date(w.date).toISOString().slice(0, 10))
+    filtered = filtered.filter(
+      (w) =>
+        ids.has(w.id) ||
+        dates.has(new Date(w.date).toISOString().slice(0, 10))
     );
   }
 
@@ -64,6 +72,7 @@ export async function listWorkouts(req, res) {
       date: w.date,
       workoutType: w.workoutType,
       duration: w.duration,
+      finishedAt: w.finishedAt,
       ...stats,
     };
   });
@@ -75,14 +84,30 @@ export async function createWorkout(req, res) {
   const userId = req.user.id;
   const { name, date, workoutType, notes, duration } = req.body;
   if (!name) throw httpError(400, 'name required');
+
+  const baseDate = date ? new Date(date) : new Date();
+  const dur = duration != null ? Number(duration) : null;
+
+  let startTime = null;
+  let endTime = null;
+  if (dur && dur > 0) {
+    // Backfill: gán endTime 20:00 local của ngày, startTime = end - duration
+    const end = new Date(baseDate);
+    end.setHours(20, 0, 0, 0);
+    endTime = end;
+    startTime = new Date(end.getTime() - dur * 1000);
+  }
+
   const workout = await prisma.workout.create({
     data: {
       userId,
       name,
-      date: date ? new Date(date) : new Date(),
+      date: baseDate,
       workoutType: workoutType || 'strength',
       notes: notes || null,
-      duration: duration != null ? Number(duration) : null,
+      duration: dur,
+      startTime,
+      endTime,
     },
   });
   res.status(201).json({ workout });
@@ -131,7 +156,9 @@ export async function deleteWorkout(req, res) {
   const { id } = req.params;
   const workout = await prisma.workout.findFirst({ where: { id, userId: req.user.id } });
   if (!workout) throw httpError(404, 'Workout not found');
+  await clearPRsForWorkout(id);
   await prisma.workout.delete({ where: { id } });
+  await rebuildAllPRs(req.user.id);
   res.json({ ok: true });
 }
 
@@ -144,66 +171,92 @@ export async function finishWorkout(req, res) {
   });
   if (!workout) throw httpError(404, 'Workout not found');
 
-  const isBackfill = workout.startTime === null && workout.duration !== null;
-  const endTime = new Date();
-  let duration = workout.duration;
-
-  if (!isBackfill && !workout.startTime) {
-    const startTime = workout.createdAt;
-    duration = durationSeconds(startTime, endTime);
-    await prisma.workout.update({
-      where: { id },
-      data: { endTime, startTime, duration },
-    });
-  } else if (!isBackfill && workout.startTime && !workout.endTime) {
-    duration = durationSeconds(workout.startTime, endTime);
-    await prisma.workout.update({
-      where: { id },
-      data: { endTime, duration },
-    });
+  // Idempotent: nếu đã finish → trả summary hiện tại, không ghi lại PR
+  if (workout.finishedAt) {
+    const summary = await buildSummary(id);
+    return res.json({ workout, summary, alreadyFinished: true });
   }
 
-  let totalSets = 0;
-  let totalReps = 0;
-  let totalVolume = 0;
-  const prsDetected = [];
+  const endTime = new Date();
+  const isBackfill = workout.startTime !== null && workout.duration !== null;
 
+  let duration = workout.duration;
+  if (!isBackfill) {
+    const startTime = workout.startTime || workout.createdAt;
+    duration = durationSeconds(startTime, endTime);
+  }
+
+  await prisma.workout.update({
+    where: { id },
+    data: {
+      endTime: workout.endTime || endTime,
+      startTime: workout.startTime || workout.createdAt,
+      duration,
+      finishedAt: endTime,
+    },
+  });
+
+  // Evaluate + persist PRs (loại trừ chính workout này khỏi prior)
   for (const we of workout.exercises) {
     for (const s of we.sets) {
-      totalSets++;
-      totalReps += s.reps;
-      totalVolume += volume(s.weight, s.reps);
-      const created = await evaluatePRs({
+      const candidates = await evaluatePRs({
         userId,
         exerciseId: we.exerciseId,
         weight: s.weight,
         reps: s.reps,
         achievedAt: endTime,
-        workoutId: id,
+        excludeWorkoutId: id,
       });
-      prsDetected.push(
-        ...created.map((p) => ({
-          exercise: we.exercise.name,
-          type: p.type,
-          value: p.value,
-        }))
-      );
+      if (!candidates.length) continue;
+      await persistPRs({
+        userId,
+        exerciseId: we.exerciseId,
+        workoutId: id,
+        prs: candidates,
+      });
     }
   }
 
   const updated = await prisma.workout.findUnique({ where: { id } });
+  const summary = await buildSummary(id);
+  res.json({ workout: updated, summary });
+}
 
-  res.json({
-    workout: updated,
-    summary: {
-      duration: updated.duration,
-      exercises: workout.exercises.length,
-      sets: totalSets,
-      reps: totalReps,
-      volume: totalVolume,
-      prs: prsDetected,
-    },
+async function buildSummary(workoutId) {
+  const full = await prisma.workout.findUnique({
+    where: { id: workoutId },
+    include: { exercises: { include: { exercise: true, sets: true } } },
   });
+  if (!full) return null;
+
+  let totalSets = 0;
+  let totalReps = 0;
+  let totalVolume = 0;
+  for (const we of full.exercises) {
+    for (const s of we.sets) {
+      totalSets++;
+      totalReps += s.reps;
+      totalVolume += volume(s.weight, s.reps);
+    }
+  }
+
+  const prs = await prisma.personalRecord.findMany({
+    where: { workoutId },
+    include: { exercise: { select: { name: true } } },
+  });
+
+  return {
+    duration: full.duration,
+    exercises: full.exercises.length,
+    sets: totalSets,
+    reps: totalReps,
+    volume: totalVolume,
+    prs: prs.map((p) => ({
+      exercise: p.exercise.name,
+      type: p.type,
+      value: p.value,
+    })),
+  };
 }
 
 export async function addExercise(req, res) {
@@ -403,6 +456,11 @@ export async function bulkDeleteWorkouts(req, res) {
   const allowed = workouts.map((w) => w.id);
   if (allowed.length === 0) throw httpError(404, 'No matching workouts');
 
+  await prisma.personalRecord.deleteMany({
+    where: { userId, workoutId: { in: allowed } },
+  });
   await prisma.workout.deleteMany({ where: { id: { in: allowed } } });
+  await rebuildAllPRs(userId);
+
   res.json({ deleted: allowed.length });
 }

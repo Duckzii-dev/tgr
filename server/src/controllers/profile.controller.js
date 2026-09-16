@@ -12,6 +12,7 @@ export async function getProfile(req, res) {
       avatarUrl: true,
       googleId: true,
       emailVerified: true,
+      timezone: true,
       createdAt: true,
       passwordHash: true,
     },
@@ -21,11 +22,26 @@ export async function getProfile(req, res) {
 }
 
 export async function updateProfile(req, res) {
-  const { name, avatarUrl } = req.body;
+  const { name, avatarUrl, timezone } = req.body;
+
+  let tz = timezone;
+  if (tz) {
+    try {
+      // validate IANA timezone
+      new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    } catch {
+      throw httpError(400, 'Invalid timezone');
+    }
+  }
+
   const user = await prisma.user.update({
     where: { id: req.user.id },
-    data: { name, avatarUrl },
-    select: { id: true, email: true, name: true, avatarUrl: true },
+    data: {
+      name,
+      avatarUrl,
+      ...(tz ? { timezone: tz } : {}),
+    },
+    select: { id: true, email: true, name: true, avatarUrl: true, timezone: true },
   });
   res.json({ user });
 }

@@ -6,6 +6,11 @@ export default function RestTimer({ onClose }) {
   const [remaining, setRemaining] = useState(90);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef(null);
+  const durationRef = useRef(duration);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   useEffect(() => {
     if (!running) return;
@@ -14,15 +19,7 @@ export default function RestTimer({ onClose }) {
         if (r <= 1) {
           clearInterval(intervalRef.current);
           setRunning(false);
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Rest complete', { body: 'Time to lift!' });
-          } else {
-            try {
-              new Audio(
-                'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
-              ).play();
-            } catch {}
-          }
+          notifyDone();
           return 0;
         }
         return r - 1;
@@ -30,6 +27,39 @@ export default function RestTimer({ onClose }) {
     }, 1000);
     return () => clearInterval(intervalRef.current);
   }, [running]);
+
+  const notifyDone = async () => {
+    if (!('Notification' in window)) return fallbackBeep();
+    if (Notification.permission === 'granted') {
+      new Notification('Rest complete', { body: 'Time to lift!' });
+      return;
+    }
+    if (Notification.permission !== 'denied') {
+      try {
+        const p = await Notification.requestPermission();
+        if (p === 'granted') {
+          new Notification('Rest complete', { body: 'Time to lift!' });
+          return;
+        }
+      } catch {}
+    }
+    fallbackBeep();
+  };
+
+  const fallbackBeep = () => {
+    try {
+      new Audio(
+        'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
+      ).play();
+    } catch {}
+  };
+
+  const start = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    setRunning(true);
+  };
 
   const setPreset = (s) => {
     setDuration(s);
@@ -83,7 +113,10 @@ export default function RestTimer({ onClose }) {
         <button className="btn btn-ghost" onClick={() => adjust(-30)}>
           <Minus className="w-4 h-4" />30
         </button>
-        <button className="btn btn-primary" onClick={() => setRunning((x) => !x)}>
+        <button
+          className="btn btn-primary"
+          onClick={() => (running ? setRunning(false) : start())}
+        >
           {running ? (
             <>
               <Pause className="w-4 h-4" />
@@ -103,7 +136,7 @@ export default function RestTimer({ onClose }) {
           className="btn btn-ghost"
           onClick={() => {
             setRunning(false);
-            setRemaining(duration);
+            setRemaining(durationRef.current);
           }}
         >
           <SkipForward className="w-4 h-4" />

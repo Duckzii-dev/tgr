@@ -17,6 +17,24 @@ const DAYS = [
 ];
 const TYPES = ['strength', 'cardio', 'recovery', 'rest'];
 
+const TIMEZONES = [
+  'UTC',
+  'Asia/Ho_Chi_Minh',
+  'Asia/Bangkok',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Shanghai',
+  'Asia/Kolkata',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Australia/Sydney',
+];
+
 export default function Settings() {
   const { theme, setTheme } = useTheme();
   const toast = useToast();
@@ -25,10 +43,14 @@ export default function Settings() {
   const schedule = useFetch(() => api.get('/profile/schedule'), []);
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
   const [name, setName] = useState('');
+  const [timezone, setTimezone] = useState('UTC');
   const [sched, setSched] = useState({});
 
   useEffect(() => {
-    if (data?.user) setName(data.user.name || '');
+    if (data?.user) {
+      setName(data.user.name || '');
+      setTimezone(data.user.timezone || 'UTC');
+    }
   }, [data]);
 
   useEffect(() => {
@@ -43,9 +65,10 @@ export default function Settings() {
 
   const saveProfile = async () => {
     try {
-      await api.put('/profile', { name });
+      await api.put('/profile', { name, timezone });
       toast('Profile updated');
       refresh();
+      reload();
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -126,6 +149,21 @@ export default function Settings() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </div>
+        <div>
+          <label className="label">Timezone</label>
+          <select
+            className="input"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+          >
+            {TIMEZONES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <div className="text-xs text-ink-400 mt-1">
+            Ảnh hưởng tới cách hiển thị calendar, streak và analytics.
+          </div>
         </div>
         <button className="btn btn-primary" onClick={saveProfile}>
           Save

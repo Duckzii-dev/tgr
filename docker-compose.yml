@@ -1,13 +1,12 @@
-
 services:
   db:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
       MYSQL_DATABASE: gym_progress
       MYSQL_USER: gym
-      MYSQL_PASSWORD: gympass
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-gympass}
     ports:
       - "3306:3306"
     volumes:
@@ -25,25 +24,29 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: "mysql://gym:gympass@db:3306/gym_progress"
+      DATABASE_URL: "mysql://gym:${MYSQL_PASSWORD:-gympass}@db:3306/gym_progress"
       PORT: 4000
       NODE_ENV: production
-      JWT_SECRET: "change-me-in-production-please-32-chars-min"
-      CLIENT_URL: "http://localhost:5173"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET required}"
+      CLIENT_URL: "${CLIENT_URL:-http://localhost:5173}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
       GOOGLE_CALLBACK_URL: "${GOOGLE_CALLBACK_URL:-http://localhost:4000/api/auth/google/callback}"
+      TURNSTILE_SECRET_KEY: "${TURNSTILE_SECRET_KEY:-}"
+      SEED_EMAIL: "${SEED_EMAIL:-}"
+      SEED_PASSWORD: "${SEED_PASSWORD:-}"
     ports:
       - "4000:4000"
     command: sh -c "npx prisma migrate deploy && node prisma/seed.js && node src/index.js"
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        VITE_TURNSTILE_SITE_KEY: "${VITE_TURNSTILE_SITE_KEY:-}"
     restart: unless-stopped
     depends_on:
       - server
-    environment:
-      VITE_API_URL: "http://localhost:4000/api"
     ports:
       - "5173:5173"
 

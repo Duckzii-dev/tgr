@@ -16,5 +16,10 @@ body {
 .label { @apply block text-xs uppercase tracking-wide text-ink-400 mb-1; }
 .chip { @apply inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-ink-800 border border-ink-700 text-ink-300; }
 
-.light .card { @apply bg-white border-gray-200; }
-.light body { @apply bg-gray-50 text-gray-900; }
+/* Light theme — selector phải là html.light vì theme.jsx toggle trên documentElement */
+html.light body { @apply bg-gray-50 text-gray-900; }
+html.light .card { @apply bg-white border-gray-200; }
+html.light .btn-ghost { @apply bg-gray-100 hover:bg-gray-200 text-gray-900 border-gray-200; }
+html.light .input { @apply bg-white border-gray-300 text-gray-900 placeholder-gray-400; }
+html.light .label { @apply text-gray-500; }
+html.light .chip { @apply bg-gray-100 border-gray-200 text-gray-600; }

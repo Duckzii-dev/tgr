@@ -27,21 +27,11 @@ export default function NewWorkout() {
         date,
         notes: notes || null,
       };
+      // Server tự tính startTime/endTime khi có duration
       if (duration && Number(duration) > 0) {
         body.duration = Number(duration) * 60; // minutes → seconds
       }
       const { workout } = await api.post('/workouts', body);
-
-      // Nếu backfill có duration → set luôn startTime/endTime hợp lý
-      if (body.duration) {
-        const end = new Date(date + 'T20:00:00');
-        const start = new Date(end.getTime() - body.duration * 1000);
-        await api.put(`/workouts/${workout.id}`, {
-          startTime: start.toISOString(),
-          endTime: end.toISOString(),
-        });
-      }
-
       toast('Workout created');
       nav(`/workouts/${workout.id}`);
     } catch (e) {

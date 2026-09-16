@@ -1,7 +1,18 @@
 import { prisma } from '../utils/prisma.js';
 import { epley1RM, volume } from '../utils/calc.js';
 
-export async function evaluatePRs({ userId, exerciseId, weight, reps, achievedAt, workoutId }) {
+/**
+ * Đánh giá PR cho một set so với lịch sử TRƯỚC ĐÓ (loại trừ chính workout đang xét).
+ * Trả về mảng candidate PR (chưa persist).
+ */
+export async function evaluatePRs({
+  userId,
+  exerciseId,
+  weight,
+  reps,
+  achievedAt,
+  excludeWorkoutId,
+}) {
   const w = Number(weight);
   const r = Number(reps);
   const est = epley1RM(w, r);
@@ -20,7 +31,10 @@ export async function evaluatePRs({ userId, exerciseId, weight, reps, achievedAt
     where: {
       workoutExercise: {
         exerciseId,
-        workout: { userId, ...(workoutId ? { NOT: { id: workoutId } } : {}) },
+        workout: {
+          userId,
+          ...(excludeWorkoutId ? { NOT: { id: excludeWorkoutId } } : {}),
+        },
       },
     },
     select: { weight: true, reps: true, estimated1RM: true },
@@ -54,4 +68,122 @@ export async function evaluatePRs({ userId, exerciseId, weight, reps, achievedAt
     }
   }
   return newPRs;
+}
+
+/**
+ * Persist PR vào bảng PersonalRecord — upsert theo (userId, exerciseId, type).
+ * Mỗi exercise+type chỉ giữ 1 PR tốt nhất.
+ */
+export async function persistPRs({ userId, exerciseId, workoutId, prs }) {
+  if (!prs.length) return [];
+  const created = [];
+  for (const p of prs) {
+    const row = await prisma.personalRecord.upsert({
+      where: {
+        userId_exerciseId_type: {
+          userId,
+          exerciseId,
+          type: p.type,
+        },
+      },
+      create: {
+        userId,
+        exerciseId,
+        workoutId: workoutId || null,
+        type: p.type,
+        value: p.value,
+        reps: p.reps ?? null,
+        weight: p.weight ?? null,
+        achievedAt: p.achievedAt,
+      },
+      update: {
+        value: p.value,
+        reps: p.reps ?? null,
+        weight: p.weight ?? null,
+        achievedAt: p.achievedAt,
+        workoutId: workoutId || null,
+      },
+    });
+    created.push(row);
+  }
+  return created;
+}
+
+/**
+ * Xoá toàn bộ PR gắn với một workout (dùng khi delete/bulk-delete).
+ * Sau khi xoá nên gọi rebuildAllPRs để tính lại từ lịch sử còn lại.
+ */
+export async function clearPRsForWorkout(workoutId) {
+  await prisma.personalRecord.deleteMany({ where: { workoutId } });
+}
+
+/**
+ * Recompute lại toàn bộ PR cho một user (dùng khi bulk-delete workout).
+ * Xoá sạch rồi build lại từ WorkoutSet theo thứ tự thời gian.
+ */
+export async function rebuildAllPRs(userId) {
+  await prisma.personalRecord.deleteMany({ where: { userId } });
+
+  const sets = await prisma.workoutSet.findMany({
+    where: { workoutExercise: { workout: { userId } } },
+    include: {
+      workoutExercise: {
+        include: {
+          workout: { select: { id: true, date: true } },
+        },
+      },
+    },
+    orderBy: [
+      { workoutExercise: { workout: { date: 'asc' } } },
+      { setNumber: 'asc' },
+    ],
+  });
+
+  const bestByExercise = new Map();
+
+  for (const s of sets) {
+    const exId = s.workoutExercise.exerciseId;
+    const at = s.workoutExercise.workout.date;
+    const workoutId = s.workoutExercise.workout.id;
+    const w = s.weight;
+    const r = s.reps;
+    const est = s.estimated1RM ?? epley1RM(w, r);
+    const vol = volume(w, r);
+
+    const candidates = [
+      { type: 'max_weight', value: w, reps: r, weight: w },
+      { type: 'max_reps', value: r, reps: r, weight: w },
+      { type: 'max_volume', value: vol, reps: r, weight: w },
+    ];
+    if (est != null && r > 0 && r <= 20) {
+      candidates.push({ type: 'estimated_1rm', value: est, reps: r, weight: w });
+    }
+
+    for (const c of candidates) {
+      const key = `${exId}:${c.type}`;
+      const cur = bestByExercise.get(key);
+      if (!cur || c.value > cur.value) {
+        bestByExercise.set(key, { ...c, achievedAt: at, workoutId });
+      }
+    }
+  }
+
+  let count = 0;
+  for (const [key, v] of bestByExercise.entries()) {
+    const [exerciseId, type] = key.split(':');
+    await prisma.personalRecord.create({
+      data: {
+        userId,
+        exerciseId,
+        workoutId: v.workoutId,
+        type,
+        value: v.value,
+        reps: v.reps ?? null,
+        weight: v.weight ?? null,
+        achievedAt: v.achievedAt,
+      },
+    });
+    count++;
+  }
+  return count;
 }
