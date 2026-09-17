@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, X, Play, Activity, BookOpen } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
@@ -17,11 +17,7 @@ function getLocalMapUrl(exId) {
 
 export default function AnatomeLibrary() {
   const [q, setQ] = useState('');
-  const [bodyPart, setBodyPart] = useState('');
-  const [equipment, setEquipment] = useState('');
-  const [difficulty, setDifficulty] = useState('');
   const [muscleSlug, setMuscleSlug] = useState('');
-  const [category, setCategory] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [detail, setDetail] = useState(null);
 
@@ -32,28 +28,15 @@ export default function AnatomeLibrary() {
     () => {
       const p = new URLSearchParams();
       if (q) p.set('q', q);
-      if (bodyPart) p.set('bodyPart', bodyPart);
-      if (equipment) p.set('equipment', equipment);
-      if (difficulty) p.set('difficulty', difficulty);
       if (muscleSlug) p.set('muscleSlug', muscleSlug);
-      if (category) p.set('category', category);
       p.set('limit', '100');
       return api.get(`/anatome/exercises?${p}`);
     },
-    [q, bodyPart, equipment, difficulty, muscleSlug, category]
+    [q, muscleSlug]
   );
 
   const exercises = data?.exercises || [];
   const total = data?.total || 0;
-  const hasFilters = bodyPart || equipment || difficulty || muscleSlug || category;
-
-  const clearFilters = () => {
-    setBodyPart('');
-    setEquipment('');
-    setDifficulty('');
-    setMuscleSlug('');
-    setCategory('');
-  };
 
   return (
     <div className="space-y-4">
@@ -62,7 +45,7 @@ export default function AnatomeLibrary() {
         <div>
           <h1 className="text-2xl font-semibold">Exercise Library</h1>
           <p className="text-sm text-ink-400 mt-0.5">
-            {fmtNumber(meta.data?.total) || '...'} bài tập · Muscle maps local
+            {fmtNumber(meta.data?.total) || '...'} bài tập · SVG local
           </p>
         </div>
       </div>
@@ -82,70 +65,32 @@ export default function AnatomeLibrary() {
             className={`btn btn-ghost ${showFilters ? 'border-accent text-accent' : ''}`}
             onClick={() => setShowFilters((v) => !v)}
           >
-            <Filter className="w-4 h-4" /> Filters
-            {hasFilters && (
-              <span className="ml-1 px-1.5 rounded-full bg-accent text-ink-950 text-[10px] font-bold">
-                {[bodyPart, equipment, difficulty, muscleSlug, category].filter(Boolean).length}
-              </span>
-            )}
+            <Filter className="w-4 h-4" /> Muscle
           </button>
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-ink-700">
-            <div>
-              <label className="label">Body Part</label>
-              <select className="input" value={bodyPart} onChange={(e) => setBodyPart(e.target.value)}>
-                <option value="">All</option>
-                {(facets.data?.bodyParts || []).map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
+          <div className="pt-2 border-t border-ink-700">
+            <label className="label">Muscle</label>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {muscleSlug && (
+                <button
+                  className="chip border-accent text-accent"
+                  onClick={() => setMuscleSlug('')}
+                >
+                  <X className="w-3 h-3" /> {muscleSlug}
+                </button>
+              )}
+              {(facets.data?.muscleSlugs || []).slice(0, 40).map((m) => (
+                <button
+                  key={m}
+                  className={`chip ${muscleSlug === m ? 'border-accent text-accent' : ''}`}
+                  onClick={() => setMuscleSlug(muscleSlug === m ? '' : m)}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="label">Equipment</label>
-              <select className="input" value={equipment} onChange={(e) => setEquipment(e.target.value)}>
-                <option value="">All</option>
-                {(facets.data?.equipments || []).map((e) => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Difficulty</label>
-              <select className="input" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-                <option value="">All</option>
-                {(facets.data?.difficulties || []).map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Category</label>
-              <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
-                <option value="">All</option>
-                {(facets.data?.categories || []).map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2 md:col-span-4">
-              <label className="label">Muscle</label>
-              <select className="input" value={muscleSlug} onChange={(e) => setMuscleSlug(e.target.value)}>
-                <option value="">All</option>
-                {(facets.data?.muscleSlugs || []).map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            {hasFilters && (
-              <button
-                className="btn btn-ghost text-xs col-span-2 md:col-span-4 justify-center"
-                onClick={clearFilters}
-              >
-                <X className="w-3 h-3" /> Clear filters
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -153,7 +98,7 @@ export default function AnatomeLibrary() {
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {Array.from({ length: 12 }).map((_, i) => (
-            <Skeleton key={i} className="h-44" />
+            <Skeleton key={i} className="h-60" />
           ))}
         </div>
       ) : exercises.length ? (
@@ -163,49 +108,12 @@ export default function AnatomeLibrary() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {exercises.map((ex) => (
-              <button
-                key={ex.id}
-                onClick={() => setDetail(ex)}
-                className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
-              >
-                <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
-                  {ex.name}
-                </div>
-
-                {ex.primaryMuscles?.length > 0 && (
-                  <div className="text-xs text-accent line-clamp-1 flex items-center gap-1">
-                    <Activity className="w-3 h-3 shrink-0" />
-                    <span>{ex.primaryMuscles.slice(0, 2).join(', ')}</span>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-1">
-                  {ex.equipment && (
-                    <span className="chip text-[10px]">{ex.equipment}</span>
-                  )}
-                  {ex.difficulty && (
-                    <span className="chip text-[10px] capitalize">{ex.difficulty}</span>
-                  )}
-                  {ex.mechanic && (
-                    <span className="chip text-[10px]">{ex.mechanic}</span>
-                  )}
-                </div>
-
-                {ex.videoUrl && (
-                  <div className="text-[10px] text-ink-500 flex items-center gap-1">
-                    <Play className="w-3 h-3" /> Video
-                  </div>
-                )}
-              </button>
+              <ExerciseCard key={ex.id} ex={ex} onClick={() => setDetail(ex)} />
             ))}
           </div>
         </>
       ) : (
-        <Empty
-          title="Không tìm thấy bài tập"
-          hint="Thử đổi từ khoá hoặc filter."
-          icon={Search}
-        />
+        <Empty title="Không tìm thấy bài tập" hint="Thử đổi từ khoá." icon={Search} />
       )}
 
       <Modal
@@ -220,83 +128,168 @@ export default function AnatomeLibrary() {
   );
 }
 
-function ExerciseDetailContent({ ex }) {
-  const [showMap, setShowMap] = useState(false);
-  const [mapError, setMapError] = useState(false);
+function ExerciseCard({ ex, onClick }) {
+  const [svg, setSvg] = useState(null);
+  const [svgLoading, setSvgLoading] = useState(true);
   const mapUrl = getLocalMapUrl(ex.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(mapUrl)
+      .then((r) => r.text())
+      .then((text) => {
+        if (cancelled) return;
+        // Strip xml declaration + comment
+        const cleaned = text
+          .replace(/<\?xml[^?]*\?>/g, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .trim();
+        setSvg(cleaned);
+        setSvgLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setSvgLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [mapUrl]);
+
+  return (
+    <button
+      onClick={onClick}
+      className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
+    >
+      {/* SVG preview */}
+      <div className="relative bg-ink-950 rounded-lg h-40 flex items-center justify-center overflow-hidden">
+        {svgLoading ? (
+          <div className="text-xs text-ink-500">Loading...</div>
+        ) : svg ? (
+          <div
+            className="w-full h-full flex items-center justify-center p-2"
+            style={{ maxHeight: '160px' }}
+            dangerouslySetInnerHTML={{
+              __html: svg.replace(
+                /<svg([^>]*)>/,
+                '<svg$1 style="max-width:100%;max-height:150px;width:auto;height:auto;">'
+              ),
+            }}
+          />
+        ) : (
+          <div className="text-xs text-ink-500">No preview</div>
+        )}
+      </div>
+
+      <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
+        {ex.name}
+      </div>
+
+      {ex.primaryMuscles?.length > 0 && (
+        <div className="text-xs text-accent line-clamp-2 flex items-start gap-1">
+          <Activity className="w-3 h-3 shrink-0 mt-0.5" />
+          <span>{ex.primaryMuscles.slice(0, 3).join(', ')}</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function ExerciseDetailContent({ ex }) {
+  const [svg, setSvg] = useState(null);
+  const [svgLoading, setSvgLoading] = useState(true);
+  const [hoveredMuscle, setHoveredMuscle] = useState(null);
+  const mapUrl = getLocalMapUrl(ex.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(mapUrl)
+      .then((r) => r.text())
+      .then((text) => {
+        if (cancelled) return;
+        const cleaned = text
+          .replace(/<\?xml[^?]*\?>/g, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .trim();
+        setSvg(cleaned);
+        setSvgLoading(false);
+      })
+      .catch(() => setSvgLoading(false));
+    return () => { cancelled = true; };
+  }, [mapUrl]);
+
+  // Highlight muscle khi hover vào pill
+  const handleMuscleHover = (muscleLabel) => {
+    if (!svg) return;
+    setHoveredMuscle(muscleLabel);
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {ex.equipment && <span className="chip">{ex.equipment}</span>}
-        {ex.difficulty && <span className="chip capitalize">{ex.difficulty}</span>}
-        {ex.category && <span className="chip capitalize">{ex.category}</span>}
-        {ex.mechanic && <span className="chip capitalize">{ex.mechanic}</span>}
-        {ex.force && <span className="chip capitalize">{ex.force}</span>}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
+      {/* Muscles info */}
+      <div className="space-y-3">
         {ex.primaryMuscles?.length > 0 && (
           <div>
             <div className="label">Primary Muscles</div>
-            <div className="text-sm text-accent font-medium">
-              {ex.primaryMuscles.join(', ')}
+            <div className="flex flex-wrap gap-1.5">
+              {ex.primaryMuscles.map((m) => (
+                <button
+                  key={m}
+                  className={`chip ${
+                    hoveredMuscle === m ? 'border-accent text-accent' : ''
+                  }`}
+                  onMouseEnter={() => handleMuscleHover(m)}
+                  onMouseLeave={() => handleMuscleHover(null)}
+                >
+                  <Activity className="w-3 h-3" /> {m}
+                </button>
+              ))}
             </div>
           </div>
         )}
+
         {ex.secondaryMuscles?.length > 0 && (
           <div>
-            <div className="label">Secondary</div>
-            <div className="text-sm text-ink-300">
-              {ex.secondaryMuscles.join(', ')}
+            <div className="label">Secondary Muscles</div>
+            <div className="flex flex-wrap gap-1.5">
+              {ex.secondaryMuscles.map((m) => (
+                <button
+                  key={m}
+                  className="chip text-ink-400"
+                  onMouseEnter={() => handleMuscleHover(m)}
+                  onMouseLeave={() => handleMuscleHover(null)}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
           </div>
         )}
       </div>
 
+      {/* SVG Diagram — to, nổi bật */}
       <div>
-        <button
-          className="btn btn-ghost w-full justify-center"
-          onClick={() => setShowMap((v) => !v)}
-        >
-          <Activity className="w-4 h-4" />
-          {showMap ? 'Hide' : 'Show'} Muscle Map
-        </button>
-        {showMap && (
-          <div className="mt-3 flex justify-center bg-ink-950 rounded-xl p-4 min-h-[420px]">
-            {mapError ? (
-              <div className="text-xs text-ink-500 self-center text-center px-4">
-                Muscle map chưa có cho bài tập này.
-              </div>
-            ) : (
-              <img
-                src={mapUrl}
-                alt={`Muscle map for ${ex.name}`}
-                width={280}
-                height={420}
-                className="max-w-full"
-                onError={() => setMapError(true)}
-                loading="lazy"
-              />
-            )}
-          </div>
-        )}
+        <div className="label mb-2">Muscle Map</div>
+        <div className="bg-ink-950 rounded-xl p-6 flex items-center justify-center min-h-[500px]">
+          {svgLoading ? (
+            <div className="text-xs text-ink-500 animate-pulse">
+              Loading muscle map...
+            </div>
+          ) : svg ? (
+            <div
+              className="max-w-full"
+              style={{ width: '100%', maxWidth: '500px' }}
+              dangerouslySetInnerHTML={{
+                __html: svg.replace(
+                  /<svg([^>]*)>/,
+                  '<svg$1 style="width:100%;height:auto;display:block;">'
+                ),
+              }}
+            />
+          ) : (
+            <div className="text-xs text-ink-500">No muscle map available</div>
+          )}
+        </div>
       </div>
 
-      {ex.videoUrl && (
-        <div>
-          <div className="label">Video</div>
-          <a
-            href={ex.videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-ghost w-full justify-center"
-          >
-            <Play className="w-4 h-4" /> Watch on YouTube
-          </a>
-        </div>
-      )}
-
+      {/* Instructions */}
       {ex.instructions?.length > 0 && (
         <div>
           <div className="label">Instructions</div>
@@ -308,14 +301,17 @@ function ExerciseDetailContent({ ex }) {
         </div>
       )}
 
-      {ex.keywords?.length > 0 && (
+      {/* Video */}
+      {ex.videoUrl && (
         <div>
-          <div className="label">Keywords</div>
-          <div className="flex flex-wrap gap-1">
-            {ex.keywords.slice(0, 20).map((k, i) => (
-              <span key={i} className="chip text-[10px]">{k}</span>
-            ))}
-          </div>
+          <a
+            href={ex.videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost w-full justify-center"
+          >
+            <Play className="w-4 h-4" /> Watch on YouTube
+          </a>
         </div>
       )}
     </div>
