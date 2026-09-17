@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { fmtNumber } from '../lib/format.js';
-import { Info, ChevronRight } from 'lucide-react';
+import { Info, X } from 'lucide-react';
 import { BODY_PATHS, getPathsForMuscle, getMusclesForView, VIEWBOX } from '../lib/bodyPaths.js';
 
 const LABELS = {
@@ -43,6 +43,8 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('front');
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef(null);
 
   const byGroup = {};
   for (const r of recovery) byGroup[r.muscleGroup] = r;
@@ -108,7 +110,6 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
     return all.sort((a, b) => (a.hoursRemaining || 99) - (b.hoursRemaining || 99))[0];
   }, [groupsByStatus]);
 
-  // Render muscle path
   const renderMuscle = (slug) => {
     const paths = getPathsForMuscle(slug, view);
     if (!paths.length) return null;
@@ -130,22 +131,11 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
         {label && (
           <text
             x={slug.includes('_l') ? 82 : slug.includes('_r') ? 138 : 110}
-            y={
-              {
-                chest: 122,
-                abs: 170,
-                quads: 360,
-                hamstrings: 360,
-                glutes: 250,
-                biceps: 145,
-                triceps: 145,
-                calves: 440,
-                traps: 88,
-                middle_back: 130,
-                lower_back: 190,
-                lats: 135,
-              }[slug] || 100
-            }
+            y={{
+              chest: 122, abs: 170, quads: 360, hamstrings: 360,
+              glutes: 250, biceps: 145, triceps: 145, calves: 440,
+              traps: 88, middle_back: 130, lower_back: 190, lats: 135,
+            }[slug] || 100}
             textAnchor="middle"
             fontSize="9"
             fontWeight="700"
@@ -162,13 +152,11 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
   const musclesInView = getMusclesForView(view);
 
   return (
-    <div className="card p-4 sm:p-6 space-y-5 overflow-hidden relative">
+    <div className="card p-4 sm:p-6 space-y-5" ref={containerRef}>
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <div className="font-semibold text-lg flex items-center gap-2">
-            Muscle Recovery
-          </div>
+          <div className="font-semibold text-lg">Muscle Recovery</div>
           <div className="text-xs text-ink-400 mt-0.5">
             {groupsByStatus.fresh.length} fresh ·{' '}
             {groupsByStatus.cooled.length + groupsByStatus.recovering.length} recovering ·{' '}
@@ -194,9 +182,10 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[auto_1fr] gap-6 items-start">
+      {/* 3-column layout: body | detail | pills */}
+      <div className="grid lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
         {/* Body SVG */}
-        <div className="flex flex-col items-center gap-3 mx-auto lg:mx-0">
+        <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-2 bg-ink-850 rounded-full p-1 border border-ink-700">
             {['front', 'back'].map((v) => (
               <button
@@ -217,14 +206,13 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
             <div
               className="absolute inset-0 blur-3xl opacity-25 pointer-events-none"
               style={{
-                background:
-                  'radial-gradient(circle at 50% 40%, rgba(198,255,61,0.35), transparent 60%)',
+                background: 'radial-gradient(circle at 50% 40%, rgba(198,255,61,0.35), transparent 60%)',
               }}
             />
             <svg
               viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
-              width="260"
-              height="500"
+              width="240"
+              height="480"
               className="relative shrink-0 select-none"
               style={{ overflow: 'visible' }}
             >
@@ -266,63 +254,51 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                 `}</style>
               </defs>
 
-              {/* Base silhouette */}
               <g className="body-outline">
                 {(BODY_PATHS[view]._base || []).map((d, i) => (
                   <path key={i} d={d} />
                 ))}
               </g>
-
-              {/* Muscles */}
               {musclesInView.map((slug) => renderMuscle(slug))}
             </svg>
           </div>
 
           {nextReady && (
-            <div className="text-[11px] text-ink-400 text-center max-w-[260px]">
+            <div className="text-[11px] text-ink-400 text-center max-w-[240px]">
               Next ready:{' '}
-              <span className="text-accent font-medium">
-                {LABELS[nextReady.muscleGroup]}
-              </span>{' '}
+              <span className="text-accent font-medium">{LABELS[nextReady.muscleGroup]}</span>{' '}
               in {fmtHours(nextReady.hoursRemaining)}
             </div>
           )}
         </div>
 
-        {/* Detail panel */}
-        <div className="space-y-4 min-w-0">
-          {/* Active detail */}
-          <div
-            className="border rounded-xl p-4 transition-all duration-200 relative overflow-hidden min-h-[260px]"
-            style={{
-              borderColor: active
-                ? recoverySolid(activeData?.percent || 0, activeNever) + '66'
-                : '#262c35',
-              background: active
-                ? `linear-gradient(135deg, ${recoverySolid(activeData?.percent || 0, activeNever)}11, transparent 60%)`
-                : 'transparent',
-            }}
-          >
+        {/* Center: Detail panel with FIXED height container */}
+        <div className="hidden lg:block">
+          <div className="relative" style={{ minHeight: '480px' }}>
             {active && activeData ? (
-              <>
-                <div className="flex items-start justify-between mb-3">
+              <div
+                className="border rounded-xl p-5 transition-all duration-200"
+                style={{
+                  borderColor: recoverySolid(activeData.percent, activeNever) + '66',
+                  background: `linear-gradient(135deg, ${recoverySolid(activeData.percent, activeNever)}11, transparent 60%)`,
+                }}
+              >
+                <div className="flex items-start justify-between mb-4">
                   <div>
-                    <div className="font-semibold text-lg">{LABELS[active] || active}</div>
-                    <div className="text-xs text-ink-400">
-                      {activeNever
-                        ? 'Never trained'
-                        : `Last: ${fmtHours(activeData.hoursSince)} ago`}
+                    <div className="font-semibold text-xl">{LABELS[active] || active}</div>
+                    <div className="text-xs text-ink-400 mt-0.5">
+                      {activeNever ? 'Never trained' : `Last: ${fmtHours(activeData.hoursSince)} ago`}
                     </div>
                   </div>
                   <div className="text-right">
                     <div
-                      className="text-3xl font-bold tabular-nums"
+                      className="text-4xl font-bold tabular-nums"
                       style={{ color: recoverySolid(activeData.percent, activeNever) }}
                     >
                       {activeNever ? '—' : `${Math.round(activeData.percent)}%`}
                     </div>
                     <div
-                      className="text-[10px] uppercase tracking-wide"
+                      className="text-[10px] uppercase tracking-wide mt-1"
                       style={{ color: activeData.status?.color }}
                     >
                       {activeData.status?.label || '—'}
@@ -330,7 +306,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                   </div>
                 </div>
 
-                <div className="h-2.5 bg-ink-800 rounded-full overflow-hidden mb-4">
+                <div className="h-3 bg-ink-800 rounded-full overflow-hidden mb-5">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
@@ -341,61 +317,56 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <Stat label="Half-life" value={fmtHours(activeData.halfLife || 48)} />
-                  <Stat
-                    label="Hours since"
-                    value={activeData.hoursSince != null ? fmtHours(activeData.hoursSince) : '—'}
-                  />
+                  <Stat label="Hours since" value={activeData.hoursSince != null ? fmtHours(activeData.hoursSince) : '—'} />
                   <Stat label="Sets 7d" value={activeData.sets7d} />
                   <Stat label="Sets 30d" value={activeData.sets30d} />
-                  <Stat
-                    label="Volume 7d"
-                    value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`}
-                  />
-                  <Stat
-                    label="Volume 30d"
-                    value={`${fmtNumber((activeData.volume30d || 0) / 1000, 1)}t`}
-                  />
+                  <Stat label="Volume 7d" value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`} />
+                  <Stat label="Volume 30d" value={`${fmtNumber((activeData.volume30d || 0) / 1000, 1)}t`} />
                 </div>
 
                 {!activeNever && activeData.percent < 90 && (
-                  <div className="mt-3 text-xs flex items-center gap-2 text-ink-400">
+                  <div className="mt-4 pt-4 border-t border-ink-700 text-xs flex items-center gap-2 text-ink-400">
                     <Info className="w-3 h-3" />
                     Fresh in{' '}
-                    <span className="text-white font-medium">
-                      {fmtHours(activeData.hoursRemaining)}
-                    </span>
+                    <span className="text-white font-medium">{fmtHours(activeData.hoursRemaining)}</span>
                   </div>
                 )}
                 {!activeNever && activeData.percent >= 90 && (
-                  <div className="mt-3 text-xs flex items-center gap-2 text-accent">
+                  <div className="mt-4 pt-4 border-t border-ink-700 text-xs flex items-center gap-2 text-accent">
                     <Info className="w-3 h-3" /> Fresh — ready to train
                   </div>
                 )}
-              </>
+              </div>
             ) : (
-              <div className="flex items-center gap-3 text-ink-400 text-sm">
-                <Info className="w-4 h-4 shrink-0" />
-                <span>Chạm vào một vùng cơ trên hình để xem chi tiết</span>
+              <div className="border border-dashed border-ink-700 rounded-xl p-8 flex flex-col items-center justify-center min-h-[300px] text-center">
+                <Info className="w-8 h-8 text-ink-500 mb-3" />
+                <div className="text-sm text-ink-400">
+                  Hover hoặc click vào một vùng cơ
+                </div>
+                <div className="text-xs text-ink-500 mt-1">
+                  trên hình để xem chi tiết
+                </div>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Status groups — fixed grid để không shift */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Right: Status groups — FIXED list, không đổi khi hover */}
+        <div className="space-y-3">
           {[
             { key: 'cooked', color: '#8a1f1f', title: 'Cooked' },
             { key: 'fatigued', color: '#ff5e5e', title: 'Fatigued' },
             { key: 'recovering', color: '#ff8f3d', title: 'Recovering' },
             { key: 'cooled', color: '#ffb038', title: 'Cooled' },
             { key: 'fresh', color: '#c6ff3d', title: 'Fresh' },
-            { key: 'never', color: '#5a6470', title: 'Never trained' },
+            { key: 'never', color: '#5a6470', title: 'Never' },
           ].map(({ key, color, title }) => {
             const items = groupsByStatus[key];
             if (!items?.length) return null;
             return (
-              <StatusGroup
+              <StatusGroupFixed
                 key={key}
                 title={title}
                 color={color}
@@ -406,8 +377,40 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
               />
             );
           })}
-          </div>
         </div>
+      </div>
+
+      {/* Mobile: detail panel dưới body */}
+      <div className="lg:hidden">
+        {active && activeData && (
+          <div
+            className="border rounded-xl p-4"
+            style={{
+              borderColor: recoverySolid(activeData.percent, activeNever) + '66',
+              background: `linear-gradient(135deg, ${recoverySolid(activeData.percent, activeNever)}11, transparent 60%)`,
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">{LABELS[active]}</div>
+              <button
+                onClick={() => {
+                  setHovered(null);
+                  setSelected(null);
+                }}
+                className="text-ink-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="text-xs text-ink-400 mb-3">
+              {activeNever ? 'Never trained' : `${Math.round(activeData.percent)}% · ${fmtHours(activeData.hoursRemaining)} until fresh`}
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <Stat label="Sets 7d" value={activeData.sets7d} />
+              <Stat label="Volume 7d" value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -422,10 +425,16 @@ function Stat({ label, value }) {
   );
 }
 
-function StatusGroup({ title, color, items, active, setHovered, setSelected }) {
+/**
+ * Status group với chiều cao CỐ ĐỊNH để không đẩy pill khác.
+ */
+function StatusGroupFixed({ title, color, items, active, setHovered, setSelected }) {
   if (!items.length) return null;
   return (
-    <div className="border border-ink-700 rounded-lg p-3 min-h-[80px]">
+    <div
+      className="border border-ink-700 rounded-lg p-3"
+      style={{ minHeight: '76px' }}
+    >
       <div className="flex items-center gap-2 mb-2">
         <span
           className="w-2 h-2 rounded-full"
@@ -441,7 +450,7 @@ function StatusGroup({ title, color, items, active, setHovered, setSelected }) {
           return (
             <button
               key={r.muscleGroup}
-              className={`px-2.5 py-1 rounded-full text-xs border transition-all duration-150 flex items-center gap-1 ${
+              className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors flex items-center gap-1 ${
                 isActive
                   ? 'border-accent bg-accent/10 text-white'
                   : 'border-ink-700 hover:border-ink-500 text-ink-300'
