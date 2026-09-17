@@ -23,3 +23,27 @@ html.light .btn-ghost { @apply bg-gray-100 hover:bg-gray-200 text-gray-900 borde
 html.light .input { @apply bg-white border-gray-300 text-gray-900 placeholder-gray-400; }
 html.light .label { @apply text-gray-500; }
 html.light .chip { @apply bg-gray-100 border-gray-200 text-gray-600; }
+
+/* ============================================================
+   BODY MUSCLES CHART — z-index layering
+   Đảm bảo abs nằm trên cùng, không bị serratus/obliques che
+   ============================================================ */
+.body-muscles-container svg path[id^="abs-"] {
+  z-index: 30 !important;
+}
+.body-muscles-container svg path[id^="obliques-"] {
+  z-index: 20 !important;
+}
+.body-muscles-container svg path[id^="serratus-"] {
+  z-index: 10 !important;
+  pointer-events: none !important;
+}
+.body-muscles-container svg path[id="spine"] {
+  z-index: 5 !important;
+}
+
+/* Đảm bảo selected luôn nổi bật */
+.body-muscles-container svg path[data-selected="true"],
+.body-muscles-container svg path.selected {
+  filter: drop-shadow(0 0 4px rgba(198, 255, 61, 0.6)) !important;
+}

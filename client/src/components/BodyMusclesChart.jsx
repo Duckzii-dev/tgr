@@ -4,7 +4,7 @@ import { recoveryToBodyState, BODY_MUSCLES_ID_TO_SLUG } from '../lib/bodyMuscles
 
 /**
  * Wrapper cho body-muscles library.
- * Render SVG body với 70+ regions, hỗ trợ intensity scale.
+ * Thêm data-selected và z-index để fix overlap abs/serratus/obliques.
  */
 export default function BodyMusclesChart({
   recovery = [],
@@ -18,7 +18,6 @@ export default function BodyMusclesChart({
   const containerRef = useRef(null);
   const chartRef = useRef(null);
 
-  // Init chart
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -28,7 +27,6 @@ export default function BodyMusclesChart({
       view: libraryView,
       bodyState: {},
       onMuscleClick: (id, name) => {
-        // Map library id → system slug
         const slug = BODY_MUSCLES_ID_TO_SLUG[id];
         if (slug && onMuscleClick) onMuscleClick(slug, name);
       },
@@ -41,24 +39,27 @@ export default function BodyMusclesChart({
       enableTransitions: true,
     });
 
+    // Apply z-index + data-selected sau khi chart render
+    setTimeout(() => applyLayering(containerRef.current), 0);
+
     return () => {
       chartRef.current?.destroy();
       chartRef.current = null;
     };
   }, []);
 
-  // Update view
   useEffect(() => {
     if (!chartRef.current) return;
     const libraryView = view === 'BACK' ? ViewSide.BACK : ViewSide.FRONT;
     chartRef.current.update({ view: libraryView });
+    setTimeout(() => applyLayering(containerRef.current), 0);
   }, [view]);
 
-  // Update bodyState
   useEffect(() => {
     if (!chartRef.current) return;
     const bodyState = recoveryToBodyState(recovery, selectedSlug, hoveredSlug);
     chartRef.current.update({ bodyState });
+    setTimeout(() => applyLayering(containerRef.current), 0);
   }, [recovery, selectedSlug, hoveredSlug]);
 
   return (
@@ -74,4 +75,49 @@ export default function BodyMusclesChart({
       className="body-muscles-container"
     />
   );
+}
+
+/**
+ * Áp dụng z-index cho các path để đảm bảo abs nằm trên cùng.
+ */
+function applyLayering(container) {
+  if (!container) return;
+  const svg = container.querySelector('svg');
+  if (!svg) return;
+
+  const paths = svg.querySelectorAll('path');
+
+  // Thứ tự z-index ưu tiên (cao nhất render sau cùng)
+  const priority = {
+    abs: 100,
+    obliques: 80,
+    serratus: 60,
+    spine: 40,
+    chest: 30,
+    lats: 25,
+    traps: 20,
+  };
+
+  paths.forEach((p) => {
+    const id = p.id || p.getAttribute('data-muscle') || p.getAttribute('aria-label') || '';
+    let z = 0;
+
+    if (id.startsWith('abs')) z = priority.abs;
+    else if (id.startsWith('obliques')) z = priority.obliques;
+    else if (id.startsWith('serratus')) z = priority.serratus;
+    else if (id === 'spine') z = priority.spine;
+    else if (id.startsWith('chest')) z = priority.chest;
+    else if (id.startsWith('lats')) z = priority.lats;
+    else if (id.startsWith('traps')) z = priority.traps;
+
+    if (z > 0) {
+      p.style.zIndex = z;
+      p.style.position = 'relative';
+    }
+
+    // Data attribute cho CSS
+    if (p.getAttribute('data-selected') === 'true') {
+      p.style.filter = 'drop-shadow(0 0 4px rgba(198, 255, 61, 0.6))';
+    }
+  });
 }
