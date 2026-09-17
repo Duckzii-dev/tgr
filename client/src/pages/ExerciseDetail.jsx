@@ -6,6 +6,7 @@ import Skeleton from '../components/Skeleton.jsx';
 import Empty from '../components/Empty.jsx';
 import StatCard from '../components/StatCard.jsx';
 import LineChartCard from '../components/LineChartCard.jsx';
+import StrengthLevelCard from '../components/StrengthLevelCard.jsx';
 import { fmtDate, fmtNumber } from '../lib/format.js';
 
 const TABS = ['Overview', 'History', 'Progression', 'Intensity', 'PRs'];
@@ -74,6 +75,8 @@ export default function ExerciseDetail() {
           <p className="text-sm text-ink-300 mt-3">{exercise.overview}</p>
         )}
       </div>
+
+      <StrengthLevelCard exerciseId={exercise.id} />
 
       {exercise.videoUrl && (
         <div className="card p-0 overflow-hidden">

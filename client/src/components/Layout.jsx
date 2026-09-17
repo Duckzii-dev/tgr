@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Dumbbell, Activity, LineChart, Trophy, Target,
-  User, Settings, LogOut, Menu, X, Library, Shield,
+  User, Settings, LogOut, Menu, X, Library, Shield, Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
+import RestTimerHost from './RestTimerHost.jsx';
 
 const BASE_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -12,6 +13,7 @@ const BASE_NAV = [
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },
   { to: '/exercises', label: 'Exercises', icon: Activity },
   { to: '/import-exercises', label: 'Library', icon: Library },
+  { to: '/strength', label: 'Strength', icon: Zap },
   { to: '/progress', label: 'Progress', icon: LineChart },
   { to: '/analytics', label: 'Analytics', icon: Activity },
   { to: '/prs', label: 'PRs', icon: Trophy },
@@ -24,7 +26,7 @@ const MOBILE = [
   { to: '/', label: 'Home', icon: LayoutDashboard },
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts/new', label: 'Workout', icon: Dumbbell },
-  { to: '/import-exercises', label: 'Library', icon: Library },
+  { to: '/strength', label: 'Strength', icon: Zap },
   { to: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -129,7 +131,7 @@ export default function Layout({ children }) {
 
         <main className="flex-1 p-4 sm:p-6 pb-24 lg:pb-6 min-w-0">{children}</main>
 
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-ink-900 border-t border-ink-700 grid grid-cols-5">
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-ink-900 border-t border-ink-700 grid grid-cols-5 z-30">
           {MOBILE.map((n) => (
             <NavLink
               key={n.to}
@@ -147,6 +149,8 @@ export default function Layout({ children }) {
           ))}
         </nav>
       </div>
+
+      <RestTimerHost />
     </div>
   );
 }

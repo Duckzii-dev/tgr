@@ -9,6 +9,8 @@ import Modal from '../components/Modal.jsx';
 import Confirm from '../components/Confirm.jsx';
 import RestTimer from '../components/RestTimer.jsx';
 import Empty from '../components/Empty.jsx';
+import { startRestTimer } from '../components/RestTimerHost.jsx';
+import { getRestTimerSettings } from '../lib/restTimerSettings.js';
 import { fmtDate, fmtDuration, fmtNumber } from '../lib/format.js';
 
 export default function WorkoutDetail() {
@@ -60,10 +62,25 @@ export default function WorkoutDetail() {
     }
   };
 
-  const addSet = async (weId, payload) => {
+  const addSet = async (weId, payload, we) => {
     try {
       await api.post(`/workouts/exercises/${weId}/sets`, payload);
       refresh();
+
+      const settings = getRestTimerSettings();
+      if (settings.autoStart) {
+        const duration = payload?.restSeconds || settings.defaultDuration || 90;
+        startRestTimer({
+          duration,
+          nextExercise: we
+            ? {
+                name: we.exercise?.name,
+                weight: payload?.weight,
+                reps: payload?.reps,
+              }
+            : null,
+        });
+      }
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -161,7 +178,13 @@ export default function WorkoutDetail() {
         </div>
       </div>
 
-      {showTimer && <RestTimer onClose={() => setShowTimer(false)} />}
+      {showTimer && (
+        <RestTimer
+          onClose={() => setShowTimer(false)}
+          initialDuration={90}
+          autoStart={false}
+        />
+      )}
 
       {w.exercises.length === 0 && (
         <Empty
@@ -179,7 +202,7 @@ export default function WorkoutDetail() {
         <ExerciseBlock
           key={we.id}
           we={we}
-          onAdd={addSet}
+          onAdd={(weId, payload) => addSet(weId, payload, we)}
           onUpdate={updateSet}
           onDelete={(sid) => setDeleteSet(sid)}
           onDup={() => dupPrev(we.id)}

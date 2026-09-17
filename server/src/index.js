@@ -18,6 +18,7 @@ import analyticsRoutes from './routes/analytics.routes.js';
 import goalRoutes from './routes/goal.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import strengthRoutes from './routes/strength.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { issueCsrfToken, verifyCsrf } from './middleware/csrf.middleware.js';
 import { ipBlockGuard, getClientIp } from './middleware/ipblock.middleware.js';
@@ -34,6 +35,7 @@ app.set('trust proxy', 1);
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
+    crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -41,20 +43,32 @@ app.use(
           "'self'",
           "'unsafe-inline'",
           "https://challenges.cloudflare.com",
+          "https://*.cloudflare.com",
         ],
-        frameSrc: ["'self'", "https://challenges.cloudflare.com"],
+        scriptSrcElem: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://challenges.cloudflare.com",
+          "https://*.cloudflare.com",
+        ],
+        frameSrc: [
+          "'self'",
+          "https://challenges.cloudflare.com",
+          "https://*.cloudflare.com",
+        ],
         connectSrc: [
           "'self'",
           "https://challenges.cloudflare.com",
           "https://*.cloudflare.com",
         ],
-        imgSrc: ["'self'", "data:", "https:"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
         mediaSrc: ["'self'", "data:", "blob:", "https:"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         fontSrc: ["'self'", "data:", "https:"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],
+        workerSrc: ["'self'", "blob:"],
       },
     },
   })
@@ -81,7 +95,6 @@ app.use(
   })
 );
 
-// IP block guard — chạy TRƯỚC rate limit và mọi route /api/*
 app.use('/api', ipBlockGuard);
 
 const globalLimiter = rateLimit({
@@ -108,12 +121,14 @@ app.use('/api/calendar', verifyCsrf, calendarRoutes);
 app.use('/api/analytics', verifyCsrf, analyticsRoutes);
 app.use('/api/goals', verifyCsrf, goalRoutes);
 app.use('/api/profile', verifyCsrf, profileRoutes);
+app.use('/api/strength', verifyCsrf, strengthRoutes);
 
 const clientDist = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
+  res.setHeader('Cache-Control', 'no-store, must-revalidate');
   res.sendFile(path.join(clientDist, 'index.html'));
 });
 

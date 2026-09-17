@@ -1,0 +1,50 @@
+{
+    "_meta": {
+      "source": "Symmetric Strength-inspired, rough bodyweight ratios",
+      "note": "Ratios are 1RM / bodyweight for male. Female multiply by 0.7"
+    },
+    "male": {
+      "Bench Press": { "beginner": 0.5, "novice": 0.75, "intermediate": 1.0, "advanced": 1.5, "elite": 2.0 },
+      "Incline Bench Press": { "beginner": 0.4, "novice": 0.6, "intermediate": 0.85, "advanced": 1.25, "elite": 1.75 },
+      "Overhead Press": { "beginner": 0.35, "novice": 0.5, "intermediate": 0.7, "advanced": 1.0, "elite": 1.35 },
+      "Squat": { "beginner": 0.75, "novice": 1.0, "intermediate": 1.5, "advanced": 2.0, "elite": 2.75 },
+      "Front Squat": { "beginner": 0.6, "novice": 0.85, "intermediate": 1.2, "advanced": 1.6, "elite": 2.2 },
+      "Deadlift": { "beginner": 1.0, "novice": 1.25, "intermediate": 1.75, "advanced": 2.5, "elite": 3.25 },
+      "Romanian Deadlift": { "beginner": 0.75, "novice": 1.0, "intermediate": 1.4, "advanced": 1.9, "elite": 2.5 },
+      "Barbell Row": { "beginner": 0.5, "novice": 0.7, "intermediate": 1.0, "advanced": 1.4, "elite": 1.85 },
+      "Pull-up": { "beginner": 0.0, "novice": 0.1, "intermediate": 0.25, "advanced": 0.5, "elite": 0.75 },
+      "Chin-up": { "beginner": 0.0, "novice": 0.12, "intermediate": 0.3, "advanced": 0.55, "elite": 0.8 },
+      "Lat Pulldown": { "beginner": 0.5, "novice": 0.7, "intermediate": 0.95, "advanced": 1.2, "elite": 1.5 },
+      "Barbell Curl": { "beginner": 0.25, "novice": 0.4, "intermediate": 0.55, "advanced": 0.75, "elite": 1.0 },
+      "Hammer Curl": { "beginner": 0.15, "novice": 0.25, "intermediate": 0.35, "advanced": 0.5, "elite": 0.65 },
+      "Triceps Pushdown": { "beginner": 0.3, "novice": 0.45, "intermediate": 0.6, "advanced": 0.8, "elite": 1.0 },
+      "Skull Crusher": { "beginner": 0.25, "novice": 0.4, "intermediate": 0.55, "advanced": 0.75, "elite": 1.0 },
+      "Leg Press": { "beginner": 1.0, "novice": 1.5, "intermediate": 2.25, "advanced": 3.25, "elite": 4.5 },
+      "Leg Extension": { "beginner": 0.4, "novice": 0.6, "intermediate": 0.9, "advanced": 1.2, "elite": 1.6 },
+      "Leg Curl": { "beginner": 0.3, "novice": 0.45, "intermediate": 0.65, "advanced": 0.9, "elite": 1.2 },
+      "Hip Thrust": { "beginner": 0.75, "novice": 1.0, "intermediate": 1.5, "advanced": 2.0, "elite": 2.75 },
+      "Calf Raise": { "beginner": 0.5, "novice": 0.75, "intermediate": 1.1, "advanced": 1.6, "elite": 2.2 }
+    },
+    "female": {
+      "Bench Press": { "beginner": 0.35, "novice": 0.5, "intermediate": 0.7, "advanced": 1.0, "elite": 1.4 },
+      "Incline Bench Press": { "beginner": 0.28, "novice": 0.42, "intermediate": 0.6, "advanced": 0.85, "elite": 1.2 },
+      "Overhead Press": { "beginner": 0.25, "novice": 0.35, "intermediate": 0.5, "advanced": 0.7, "elite": 0.95 },
+      "Squat": { "beginner": 0.5, "novice": 0.7, "intermediate": 1.05, "advanced": 1.4, "elite": 1.9 },
+      "Front Squat": { "beginner": 0.4, "novice": 0.6, "intermediate": 0.85, "advanced": 1.15, "elite": 1.55 },
+      "Deadlift": { "beginner": 0.7, "novice": 0.9, "intermediate": 1.25, "advanced": 1.75, "elite": 2.3 },
+      "Romanian Deadlift": { "beginner": 0.5, "novice": 0.7, "intermediate": 1.0, "advanced": 1.35, "elite": 1.75 },
+      "Barbell Row": { "beginner": 0.35, "novice": 0.5, "intermediate": 0.7, "advanced": 1.0, "elite": 1.3 },
+      "Pull-up": { "beginner": 0.0, "novice": 0.05, "intermediate": 0.15, "advanced": 0.35, "elite": 0.55 },
+      "Chin-up": { "beginner": 0.0, "novice": 0.08, "intermediate": 0.2, "advanced": 0.4, "elite": 0.6 },
+      "Lat Pulldown": { "beginner": 0.35, "novice": 0.5, "intermediate": 0.7, "advanced": 0.85, "elite": 1.05 },
+      "Barbell Curl": { "beginner": 0.18, "novice": 0.28, "intermediate": 0.4, "advanced": 0.55, "elite": 0.7 },
+      "Hammer Curl": { "beginner": 0.1, "novice": 0.18, "intermediate": 0.25, "advanced": 0.35, "elite": 0.45 },
+      "Triceps Pushdown": { "beginner": 0.2, "novice": 0.3, "intermediate": 0.42, "advanced": 0.55, "elite": 0.7 },
+      "Skull Crusher": { "beginner": 0.18, "novice": 0.28, "intermediate": 0.4, "advanced": 0.55, "elite": 0.7 },
+      "Leg Press": { "beginner": 0.7, "novice": 1.05, "intermediate": 1.6, "advanced": 2.3, "elite": 3.2 },
+      "Leg Extension": { "beginner": 0.3, "novice": 0.42, "intermediate": 0.65, "advanced": 0.85, "elite": 1.15 },
+      "Leg Curl": { "beginner": 0.2, "novice": 0.3, "intermediate": 0.45, "advanced": 0.65, "elite": 0.85 },
+      "Hip Thrust": { "beginner": 0.55, "novice": 0.75, "intermediate": 1.05, "advanced": 1.4, "elite": 1.95 },
+      "Calf Raise": { "beginner": 0.35, "novice": 0.5, "intermediate": 0.75, "advanced": 1.15, "elite": 1.55 }
+    }
+  }

@@ -5,6 +5,10 @@ import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import Skeleton from '../components/Skeleton.jsx';
+import {
+  getRestTimerSettings,
+  setRestTimerSettings,
+} from '../lib/restTimerSettings.js';
 
 const DAYS = [
   'Sunday',
@@ -45,6 +49,7 @@ export default function Settings() {
   const [name, setName] = useState('');
   const [timezone, setTimezone] = useState('UTC');
   const [sched, setSched] = useState({});
+  const [restSettings, setRestSettings] = useState(getRestTimerSettings());
 
   useEffect(() => {
     if (data?.user) {
@@ -119,6 +124,11 @@ export default function Settings() {
       [wd]: { workoutType: 'strength', isPlanned: true, ...s[wd], ...patch },
     }));
 
+  const updateRestSetting = (patch) => {
+    const next = setRestTimerSettings(patch);
+    setRestSettings(next);
+  };
+
   if (loading) return <Skeleton className="h-64" />;
 
   return (
@@ -137,6 +147,61 @@ export default function Settings() {
               {t}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="card p-4 space-y-3">
+        <div className="font-semibold">Rest Timer</div>
+        <label className="flex items-center justify-between text-sm">
+          <span>Auto-start after adding a set</span>
+          <input
+            type="checkbox"
+            checked={restSettings.autoStart}
+            onChange={(e) =>
+              updateRestSetting({ autoStart: e.target.checked })
+            }
+          />
+        </label>
+        <label className="flex items-center justify-between text-sm">
+          <span>Sound when timer ends</span>
+          <input
+            type="checkbox"
+            checked={restSettings.soundEnabled}
+            onChange={(e) =>
+              updateRestSetting({ soundEnabled: e.target.checked })
+            }
+          />
+        </label>
+        <label className="flex items-center justify-between text-sm">
+          <span>Notification when timer ends</span>
+          <input
+            type="checkbox"
+            checked={restSettings.notificationEnabled}
+            onChange={(e) =>
+              updateRestSetting({ notificationEnabled: e.target.checked })
+            }
+          />
+        </label>
+        <div>
+          <label className="label">Default duration (seconds)</label>
+          <input
+            className="input"
+            type="number"
+            min="15"
+            max="600"
+            value={restSettings.defaultDuration}
+            onChange={(e) =>
+              updateRestSetting({
+                defaultDuration: Math.min(
+                  600,
+                  Math.max(15, Number(e.target.value) || 90)
+                ),
+              })
+            }
+          />
+          <div className="text-xs text-ink-400 mt-1">
+            Dùng khi set không có restSeconds.
+          </div>
         </div>
       </div>
 
@@ -162,7 +227,7 @@ export default function Settings() {
             ))}
           </select>
           <div className="text-xs text-ink-400 mt-1">
-            Ảnh hưởng tới cách hiển thị calendar, streak và analytics.
+            Ảnh hưởng tới calendar, streak và analytics.
           </div>
         </div>
         <button className="btn btn-primary" onClick={saveProfile}>

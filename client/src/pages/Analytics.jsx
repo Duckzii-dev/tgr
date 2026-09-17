@@ -3,6 +3,7 @@ import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import StatCard from '../components/StatCard.jsx';
 import LineChartCard from '../components/LineChartCard.jsx';
+import TrainingLoadCard from '../components/TrainingLoadCard.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import Empty from '../components/Empty.jsx';
 import { fmtDuration, fmtNumber } from '../lib/format.js';
@@ -86,6 +87,26 @@ export default function Analytics() {
             sub={`Longest ${streak.data?.longest || 0}d`}
           />
         </div>
+      )}
+
+      {loading ? (
+        <Skeleton className="h-64" />
+      ) : (
+        <>
+          <TrainingLoadCard
+            title="Training Load — by Day of Week"
+            data={data?.trainingLoadByDow || []}
+            xKey="dow"
+            defaultMetric="sets"
+          />
+
+          <TrainingLoadCard
+            title="Training Load — by Week"
+            data={data?.trainingLoadByWeek || []}
+            xKey="week"
+            defaultMetric="volume"
+          />
+        </>
       )}
 
       <div className="grid lg:grid-cols-2 gap-3">

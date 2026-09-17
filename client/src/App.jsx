@@ -20,6 +20,7 @@ import Settings from './pages/Settings.jsx';
 import ImportExercises from './pages/ImportExercises.jsx';
 import Admin from './pages/Admin.jsx';
 import AdminUserDetail from './pages/AdminUserDetail.jsx';
+import StrengthLevels from './pages/StrengthLevels.jsx';
 
 const P = ({ children }) => (
   <ProtectedRoute>
@@ -53,8 +54,8 @@ export default function App() {
       <Route path="/goals" element={<P><Goals /></P>} />
       <Route path="/profile" element={<P><Profile /></P>} />
       <Route path="/settings" element={<P><Settings /></P>} />
+      <Route path="/strength" element={<P><StrengthLevels /></P>} />
 
-      {/* Admin */}
       <Route path="/admin" element={<A><Admin /></A>} />
       <Route path="/admin/users/:id" element={<A><AdminUserDetail /></A>} />
     </Routes>

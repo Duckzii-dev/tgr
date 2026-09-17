@@ -22,6 +22,8 @@ async function getUserTz(userId) {
   return u?.timezone || 'UTC';
 }
 
+const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 export async function analyticsOverview(req, res) {
   const userId = req.user.id;
   const { from, to } = rangeFrom(req.query);
@@ -42,6 +44,22 @@ export async function analyticsOverview(req, res) {
   const weekly = {};
   const monthly = {};
 
+  // Training Load aggregations
+  const byDayOfWeek = {}; // { 'Mon': { sets, reps, volume, rirSum, rirCount, workoutCount }, ... }
+  const byWeek = {}; // { '2026-W37': { sets, reps, volume, rirSum, rirCount, workoutCount }, ... }
+
+  for (let i = 0; i < 7; i++) {
+    byDayOfWeek[DOW_LABELS[i]] = {
+      dow: DOW_LABELS[i],
+      sets: 0,
+      reps: 0,
+      volume: 0,
+      rirSum: 0,
+      rirCount: 0,
+      workoutCount: 0,
+    };
+  }
+
   for (const w of workouts) {
     totalDuration += w.duration || 0;
 
@@ -52,6 +70,28 @@ export async function analyticsOverview(req, res) {
     const mk = `${year}-${String(month).padStart(2, '0')}`;
     monthly[mk] = (monthly[mk] || 0) + (w.duration || 0);
 
+    // Training load: by day of week
+    const dateKey = dateKeyInTz(w.date, tz);
+    const dowIdx = new Date(dateKey + 'T12:00:00Z').getUTCDay();
+    const dowLabel = DOW_LABELS[dowIdx];
+    const dowBucket = byDayOfWeek[dowLabel];
+    dowBucket.workoutCount += 1;
+
+    // Training load: by week
+    if (!byWeek[wk]) {
+      byWeek[wk] = {
+        week: wk,
+        sets: 0,
+        reps: 0,
+        volume: 0,
+        rirSum: 0,
+        rirCount: 0,
+        workoutCount: 0,
+      };
+    }
+    const weekBucket = byWeek[wk];
+    weekBucket.workoutCount += 1;
+
     for (const we of w.exercises) {
       exerciseFreq[we.exercise.name] = (exerciseFreq[we.exercise.name] || 0) + 1;
       for (const s of we.sets) {
@@ -61,11 +101,51 @@ export async function analyticsOverview(req, res) {
         totalVolume += v;
         muscleVolume[we.exercise.muscleGroup] =
           (muscleVolume[we.exercise.muscleGroup] || 0) + v;
+
+        dowBucket.sets += 1;
+        dowBucket.reps += s.reps;
+        dowBucket.volume += v;
+        if (s.rir != null) {
+          dowBucket.rirSum += s.rir;
+          dowBucket.rirCount += 1;
+        }
+
+        weekBucket.sets += 1;
+        weekBucket.reps += s.reps;
+        weekBucket.volume += v;
+        if (s.rir != null) {
+          weekBucket.rirSum += s.rir;
+          weekBucket.rirCount += 1;
+        }
       }
     }
   }
 
   const durations = workouts.map((w) => w.duration || 0).filter((d) => d > 0);
+
+  // Convert aggregations to arrays
+  const trainingLoadByDow = DOW_LABELS.map((label) => {
+    const b = byDayOfWeek[label];
+    return {
+      dow: label,
+      sets: b.sets,
+      reps: b.reps,
+      volume: b.volume,
+      avgRir: b.rirCount ? +(b.rirSum / b.rirCount).toFixed(2) : null,
+      workoutCount: b.workoutCount,
+    };
+  });
+
+  const trainingLoadByWeek = Object.values(byWeek)
+    .map((b) => ({
+      week: b.week,
+      sets: b.sets,
+      reps: b.reps,
+      volume: b.volume,
+      avgRir: b.rirCount ? +(b.rirSum / b.rirCount).toFixed(2) : null,
+      workoutCount: b.workoutCount,
+    }))
+    .sort((a, b) => a.week.localeCompare(b.week));
 
   res.json({
     totalWorkouts: workouts.length,
@@ -85,6 +165,8 @@ export async function analyticsOverview(req, res) {
       .sort((a, b) => b.count - a.count),
     weeklyDuration: Object.entries(weekly).map(([week, seconds]) => ({ week, seconds })),
     monthlyDuration: Object.entries(monthly).map(([month, seconds]) => ({ month, seconds })),
+    trainingLoadByDow,
+    trainingLoadByWeek,
   });
 }
 
@@ -98,7 +180,6 @@ export async function streak(req, res) {
   });
   const dates = new Set(workouts.map((w) => dateKeyInTz(w.date, tz)));
 
-  // current: đếm lùi từ hôm nay (bỏ qua hôm nay nếu chưa tập)
   let current = 0;
   const todayKey = dateKeyInTz(new Date(), tz);
   const today = new Date(todayKey + 'T00:00:00Z');
@@ -109,14 +190,12 @@ export async function streak(req, res) {
     if (dates.has(k)) {
       current++;
     } else if (i === 0) {
-      // hôm nay chưa tập → tiếp tục đếm từ hôm qua
       continue;
     } else {
       break;
     }
   }
 
-  // longest: duyệt toàn bộ dates đã sort
   let longest = 0;
   let run = 0;
   let prev = null;

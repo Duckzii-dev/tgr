@@ -1,16 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipForward, Plus, Minus, Timer } from 'lucide-react';
+import { Play, Pause, SkipForward, Plus, Minus, Timer, X } from 'lucide-react';
+import { getRestTimerSettings } from '../lib/restTimerSettings.js';
 
-export default function RestTimer({ onClose }) {
-  const [duration, setDuration] = useState(90);
-  const [remaining, setRemaining] = useState(90);
-  const [running, setRunning] = useState(false);
+export default function RestTimer({
+  onClose,
+  initialDuration = 90,
+  autoStart = true,
+  floating = false,
+  nextExercise = null,
+}) {
+  const [duration, setDuration] = useState(initialDuration);
+  const [remaining, setRemaining] = useState(initialDuration);
+  const [running, setRunning] = useState(autoStart);
   const intervalRef = useRef(null);
   const durationRef = useRef(duration);
 
   useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
+
+  useEffect(() => {
+    setDuration(initialDuration);
+    setRemaining(initialDuration);
+    setRunning(autoStart);
+  }, [initialDuration, autoStart]);
 
   useEffect(() => {
     if (!running) return;
@@ -29,21 +42,22 @@ export default function RestTimer({ onClose }) {
   }, [running]);
 
   const notifyDone = async () => {
-    if (!('Notification' in window)) return fallbackBeep();
-    if (Notification.permission === 'granted') {
-      new Notification('Rest complete', { body: 'Time to lift!' });
-      return;
+    const settings = getRestTimerSettings();
+
+    if (settings.notificationEnabled && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('Rest complete', { body: 'Time to lift!' });
+      } else if (Notification.permission !== 'denied') {
+        try {
+          const p = await Notification.requestPermission();
+          if (p === 'granted') {
+            new Notification('Rest complete', { body: 'Time to lift!' });
+          }
+        } catch {}
+      }
     }
-    if (Notification.permission !== 'denied') {
-      try {
-        const p = await Notification.requestPermission();
-        if (p === 'granted') {
-          new Notification('Rest complete', { body: 'Time to lift!' });
-          return;
-        }
-      } catch {}
-    }
-    fallbackBeep();
+
+    if (settings.soundEnabled) fallbackBeep();
   };
 
   const fallbackBeep = () => {
@@ -72,21 +86,44 @@ export default function RestTimer({ onClose }) {
     setRemaining((r) => Math.max(0, r + delta));
   };
 
-  return (
-    <div className="card p-4 space-y-3">
+  const progress = duration > 0 ? ((duration - remaining) / duration) * 100 : 0;
+
+  const content = (
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-ink-400">
           <Timer className="w-4 h-4" /> Rest Timer
         </div>
-        <button onClick={onClose} className="text-xs text-ink-400 hover:text-white">
-          Close
+        <button
+          onClick={onClose}
+          className="text-ink-400 hover:text-white"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="text-4xl font-semibold tabular-nums text-center">
-        {String(Math.floor(remaining / 60)).padStart(2, '0')}:
-        {String(remaining % 60).padStart(2, '0')}
+      <div className="relative">
+        <div className="text-4xl font-semibold tabular-nums text-center">
+          {String(Math.floor(remaining / 60)).padStart(2, '0')}:
+          {String(remaining % 60).padStart(2, '0')}
+        </div>
+        <div className="h-1 bg-ink-800 rounded-full overflow-hidden mt-2">
+          <div
+            className="h-full bg-accent transition-all duration-1000"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       </div>
+
+      {nextExercise && (
+        <div className="text-xs text-ink-400 text-center">
+          Next: <span className="text-white">{nextExercise.name}</span>
+          {nextExercise.weight && nextExercise.reps
+            ? ` · ${nextExercise.weight}kg × ${nextExercise.reps}`
+            : ''}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 justify-center">
         {[30, 60, 90, 120, 180].map((s) => (
@@ -145,4 +182,14 @@ export default function RestTimer({ onClose }) {
       </div>
     </div>
   );
+
+  if (floating) {
+    return (
+      <div className="fixed bottom-20 lg:bottom-6 right-4 z-50 w-72 card p-4 shadow-2xl border-accent/40 bg-ink-900">
+        {content}
+      </div>
+    );
+  }
+
+  return <div className="card p-4 space-y-3">{content}</div>;
 }
