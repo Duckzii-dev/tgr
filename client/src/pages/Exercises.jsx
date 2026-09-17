@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, X, Play, Activity, Loader, BookOpen } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, X, Activity, Loader, BookOpen, Check } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import Skeleton from '../components/Skeleton.jsx';
@@ -15,6 +15,7 @@ const PAGE_SIZE = 50;
 const SOURCE_TABS = [
   { key: 'all', label: 'All' },
   { key: 'anatome', label: 'Anatome (879)' },
+  { key: 'db', label: 'Database' },
   { key: 'video', label: 'With Video' },
   { key: 'custom', label: 'Custom' },
 ];
@@ -28,9 +29,24 @@ const MUSCLE_FILTERS = [
   'glutes', 'quadriceps', 'hamstrings', 'calves',
 ];
 
-function slugify(id) {
-  return String(id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
-}
+const MUSCLE_OPTIONS = [
+  // Chest
+  { group: 'chest', label: 'Chest', slugs: ['chest', 'upper-chest'] },
+  // Back
+  { group: 'back', label: 'Back', slugs: ['lats', 'middle-back', 'lower-back', 'traps'] },
+  // Shoulders
+  { group: 'shoulders', label: 'Shoulders', slugs: ['front-delts', 'side-delts', 'rear-delts'] },
+  // Arms
+  { group: 'biceps', label: 'Biceps', slugs: ['biceps'] },
+  { group: 'triceps', label: 'Triceps', slugs: ['triceps'] },
+  { group: 'forearms', label: 'Forearms', slugs: ['forearms'] },
+  // Legs
+  { group: 'legs', label: 'Legs', slugs: ['quadriceps', 'hamstrings', 'glutes', 'calves'] },
+  // Core
+  { group: 'core', label: 'Core', slugs: ['abs', 'obliques'] },
+  // Cardio
+  { group: 'cardio', label: 'Cardio', slugs: ['cardio'] },
+];
 
 export default function Exercises() {
   const toast = useToast();
@@ -48,21 +64,16 @@ export default function Exercises() {
   const [error, setError] = useState(null);
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', muscleGroup: 'chest', equipment: '' });
 
   const offsetRef = useRef(0);
   const sentinelRef = useRef(null);
   const requestIdRef = useRef(0);
 
-  const facets = useFetch(() => api.get('/exercises/facets'), []);
-
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
     return () => clearTimeout(t);
   }, [q]);
 
-  // Load page — SERVER-SIDE filter
   const loadPage = useCallback(async (reset) => {
     const reqId = ++requestIdRef.current;
     setLoading(true);
@@ -72,13 +83,7 @@ export default function Exercises() {
     const p = new URLSearchParams();
     if (debouncedQ) p.set('q', debouncedQ);
     if (muscleSlug) p.set('muscleSlug', muscleSlug);
-
-    // Source mapping
-    if (tab === 'anatome') p.set('source', 'anatome');
-    else if (tab === 'video') p.set('source', 'video');
-    else if (tab === 'custom') p.set('source', 'custom');
-    // 'all' = no source param
-
+    if (tab !== 'all') p.set('source', tab);
     p.set('limit', String(PAGE_SIZE));
     p.set('offset', String(offset));
 
@@ -106,7 +111,6 @@ export default function Exercises() {
     }
   }, [debouncedQ, muscleSlug, tab]);
 
-  // Reset + load khi filter đổi
   useEffect(() => {
     setItems([]);
     setTotal(0);
@@ -117,7 +121,6 @@ export default function Exercises() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ, muscleSlug, tab]);
 
-  // Infinite scroll
   useEffect(() => {
     if (!hasMore || loading) return;
     const el = sentinelRef.current;
@@ -130,25 +133,8 @@ export default function Exercises() {
     return () => obs.disconnect();
   }, [hasMore, loading, loadPage]);
 
-  const submitCreate = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/exercises', form);
-      toast('Exercise created');
-      setCreateOpen(false);
-      setForm({ name: '', muscleGroup: 'chest', equipment: '' });
-      setTab('custom');
-    } catch (e) {
-      toast(e.message, 'error');
-    }
-  };
-
   const onCardClick = (ex) => {
-    if (ex.source === 'anatome') {
-      navigate(`/exercises/anatome:${ex.svgId || ex.id}`);
-    } else {
-      navigate(`/exercises/${ex.id}`);
-    }
+    navigate(`/exercises/${encodeURIComponent(ex.id)}`);
   };
 
   return (
@@ -159,7 +145,7 @@ export default function Exercises() {
           <div>
             <h1 className="text-2xl font-semibold">Exercise Library</h1>
             <p className="text-sm text-ink-400 mt-0.5">
-              Hợp nhất: DB + Anatome 879 bài
+              {fmtNumber(total)} bài tập
             </p>
           </div>
         </div>
@@ -168,7 +154,6 @@ export default function Exercises() {
         </button>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-ink-700 overflow-x-auto">
         {SOURCE_TABS.map((t) => (
           <button
@@ -185,19 +170,17 @@ export default function Exercises() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="card p-4 space-y-3">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
           <input
             className="input pl-9"
-            placeholder="Tìm bài tập (bench, squat, curl...)"
+            placeholder="Tìm bài tập..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
 
-        {/* Muscle filter */}
         <div className="space-y-2 pt-2 border-t border-ink-700">
           <div className="text-[10px] uppercase tracking-wide text-ink-500">
             Muscle
@@ -269,11 +252,8 @@ export default function Exercises() {
                   {ex.hasSvg ? (
                     <LazySvg exerciseId={ex.svgId || ex.id} className="w-full h-full p-2" />
                   ) : ex.videoUrl ? (
-                    <video
-                      src={ex.videoUrl}
-                      muted loop playsInline preload="metadata"
-                      className="w-full h-full object-cover"
-                    />
+                    <video src={ex.videoUrl} muted loop playsInline preload="metadata"
+                      className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-ink-500">
                       No media
@@ -292,7 +272,7 @@ export default function Exercises() {
                   {ex.bodyPart && (
                     <span className="chip text-[10px] capitalize">{ex.bodyPart}</span>
                   )}
-                  {ex.muscleSlugs?.map((slug) => (
+                  {ex.muscleSlugs?.slice(0, 3).map((slug) => (
                     <span key={slug} className="chip text-[10px] capitalize border-accent/40">
                       {slug.replace(/-/g, ' ')}
                     </span>
@@ -333,22 +313,94 @@ export default function Exercises() {
         />
       ) : null}
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Custom Exercise">
-        <form onSubmit={submitCreate} className="space-y-3">
+      <CustomExerciseModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => {
+          toast('Exercise created');
+          setTab('custom');
+        }}
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// Custom exercise modal — chọn nhiều muscle slugs
+// ============================================================
+function CustomExerciseModal({ open, onClose, onCreated }) {
+  const toast = useToast();
+  const [form, setForm] = useState({
+    name: '',
+    muscleGroup: 'chest',
+    equipment: '',
+    muscleSlugs: [],
+  });
+
+  useEffect(() => {
+    if (open) {
+      setForm({ name: '', muscleGroup: 'chest', equipment: '', muscleSlugs: [] });
+    }
+  }, [open]);
+
+  const toggleSlug = (slug) => {
+    setForm((f) => {
+      const has = f.muscleSlugs.includes(slug);
+      return {
+        ...f,
+        muscleSlugs: has
+          ? f.muscleSlugs.filter((s) => s !== slug)
+          : [...f.muscleSlugs, slug],
+      };
+    });
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return toast('Name required', 'error');
+
+    try {
+      await api.post('/exercises', {
+        name: form.name.trim(),
+        muscleGroup: form.muscleGroup,
+        equipment: form.equipment || null,
+        muscleSlugs: form.muscleSlugs,
+      });
+      onCreated?.();
+      onClose();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Create Custom Exercise" wide>
+      <form onSubmit={submit} className="space-y-4">
+        <div>
+          <label className="label">Name</label>
+          <input
+            className="input"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="VD: Incline Smith Bench"
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Name</label>
-            <input className="input" value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          </div>
-          <div>
-            <label className="label">Muscle Group</label>
-            <select className="input" value={form.muscleGroup}
-              onChange={(e) => setForm({ ...form, muscleGroup: e.target.value })}>
+            <label className="label">Muscle Group (chính)</label>
+            <select
+              className="input"
+              value={form.muscleGroup}
+              onChange={(e) => setForm({ ...form, muscleGroup: e.target.value })}
+            >
               <option value="chest">chest</option>
               <option value="back">back</option>
               <option value="shoulders">shoulders</option>
               <option value="biceps">biceps</option>
               <option value="triceps">triceps</option>
+              <option value="forearms">forearms</option>
               <option value="legs">legs</option>
               <option value="core">core</option>
               <option value="cardio">cardio</option>
@@ -356,12 +408,84 @@ export default function Exercises() {
           </div>
           <div>
             <label className="label">Equipment</label>
-            <input className="input" value={form.equipment}
-              onChange={(e) => setForm({ ...form, equipment: e.target.value })} />
+            <input
+              className="input"
+              value={form.equipment}
+              onChange={(e) => setForm({ ...form, equipment: e.target.value })}
+              placeholder="barbell / dumbbell / machine"
+            />
           </div>
-          <button className="btn btn-primary w-full justify-center">Create</button>
-        </form>
-      </Modal>
-    </div>
+        </div>
+
+        {/* Muscle slugs multi-select */}
+        <div>
+          <div className="label">
+            Muscle Slugs chi tiết ({form.muscleSlugs.length} đã chọn)
+          </div>
+          <div className="text-xs text-ink-400 mb-3">
+            Chọn các nhóm cơ được tác động. VD: Incline Bench → chest + upper-chest + front-delts + triceps.
+          </div>
+
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+            {MUSCLE_OPTIONS.map((group) => (
+              <div key={group.group}>
+                <div className="text-xs uppercase tracking-wide text-ink-500 mb-1.5">
+                  {group.label}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.slugs.map((slug) => {
+                    const selected = form.muscleSlugs.includes(slug);
+                    return (
+                      <button
+                        key={slug}
+                        type="button"
+                        onClick={() => toggleSlug(slug)}
+                        className={`chip text-[11px] capitalize transition-all ${
+                          selected
+                            ? 'border-accent text-accent bg-accent/10'
+                            : 'hover:border-ink-500'
+                        }`}
+                      >
+                        {selected && <Check className="w-3 h-3" />}
+                        {slug.replace(/-/g, ' ')}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {form.muscleSlugs.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-ink-700">
+              <div className="text-xs text-ink-400 mb-2">Đã chọn:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {form.muscleSlugs.map((slug) => (
+                  <span key={slug} className="chip text-[10px] capitalize border-accent">
+                    {slug.replace(/-/g, ' ')}
+                    <button
+                      type="button"
+                      onClick={() => toggleSlug(slug)}
+                      className="ml-1 hover:text-red-400"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-ink-700">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Create Exercise
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

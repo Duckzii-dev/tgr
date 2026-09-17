@@ -10,6 +10,7 @@ r.get('/facets', asyncHandler(c.facets));
 r.get('/', asyncHandler(c.listExercises));
 r.post('/', asyncHandler(c.createExercise));
 r.get('/:id', asyncHandler(c.getExercise));
+r.put('/:id', asyncHandler(c.updateExercise));
 r.delete('/:id', asyncHandler(c.deleteExercise));
 
 export default r;

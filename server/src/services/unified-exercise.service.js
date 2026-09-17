@@ -2,19 +2,9 @@ import { prisma } from '../utils/prisma.js';
 import { loadAnatomeExercises } from './anatome.service.js';
 
 export async function searchUnifiedExercises(userId, opts = {}) {
-  const {
-    q,
-    muscleGroup,
-    muscleSlug,
-    source,
-    limit = 50,
-    offset = 0,
-  } = opts;
+  const { q, muscleGroup, muscleSlug, source, limit = 50, offset = 0 } = opts;
 
-  // === 1. Fetch DB ===
-  const dbWhere = {
-    OR: [{ userId: null }, { userId }],
-  };
+  const dbWhere = { OR: [{ userId: null }, { userId }] };
   if (q) dbWhere.name = { contains: q };
   if (muscleGroup) dbWhere.muscleGroup = muscleGroup;
   if (source === 'custom') {
@@ -32,12 +22,12 @@ export async function searchUnifiedExercises(userId, opts = {}) {
       isCustom: true,
       videoUrl: true,
       imageUrl: true,
+      muscleSlugs: true,
     },
   });
 
   const dbNames = new Set(dbExercises.map((e) => e.name.toLowerCase()));
 
-  // === 2. Fetch Anatome ===
   const { exercises: anatomeExercises } = await loadAnatomeExercises();
 
   let anatomeFiltered = anatomeExercises;
@@ -54,7 +44,6 @@ export async function searchUnifiedExercises(userId, opts = {}) {
     );
   }
 
-  // === 3. Merge ===
   const merged = [];
 
   const includeDb = source !== 'anatome';
@@ -63,7 +52,15 @@ export async function searchUnifiedExercises(userId, opts = {}) {
   if (includeDb) {
     for (const ex of dbExercises) {
       if (source === 'video' && !ex.videoUrl) continue;
-      if (muscleSlug && ex.muscleGroup !== muscleSlug) continue;
+      if (muscleSlug) {
+        const customSlugs = Array.isArray(ex.muscleSlugs) ? ex.muscleSlugs : [];
+        if (!customSlugs.includes(muscleSlug) && ex.muscleGroup !== muscleSlug) continue;
+      }
+
+      const customSlugs = Array.isArray(ex.muscleSlugs) ? ex.muscleSlugs : [];
+      const mergedSlugs = customSlugs.length > 0
+        ? customSlugs
+        : (ex.muscleGroup ? [ex.muscleGroup] : []);
 
       merged.push({
         id: ex.id,
@@ -75,8 +72,8 @@ export async function searchUnifiedExercises(userId, opts = {}) {
         videoUrl: ex.videoUrl,
         imageUrl: ex.imageUrl,
         source: ex.isCustom ? 'custom' : 'db',
-        primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
-        muscleSlugs: ex.muscleGroup ? [ex.muscleGroup] : [],
+        primaryMuscles: mergedSlugs,
+        muscleSlugs: mergedSlugs,
         hasSvg: false,
       });
     }
@@ -118,6 +115,7 @@ export async function getUnifiedExercise(userId, id) {
     if (!ex) return null;
     return {
       id,
+      svgId: ex.id,
       name: ex.name,
       muscleGroup: ex.bodyPart,
       bodyPart: ex.bodyPart,
@@ -127,7 +125,6 @@ export async function getUnifiedExercise(userId, id) {
       isCustom: false,
       source: 'anatome',
       hasSvg: true,
-      svgId: ex.id,
       instructions: ex.instructions || [],
       videoUrl: null,
     };
@@ -138,6 +135,8 @@ export async function getUnifiedExercise(userId, id) {
   });
   if (!ex) return null;
 
+  const customSlugs = Array.isArray(ex.muscleSlugs) ? ex.muscleSlugs : [];
+
   return {
     id: ex.id,
     name: ex.name,
@@ -147,8 +146,8 @@ export async function getUnifiedExercise(userId, id) {
     source: ex.isCustom ? 'custom' : 'db',
     videoUrl: ex.videoUrl,
     imageUrl: ex.imageUrl,
-    primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
-    muscleSlugs: ex.muscleGroup ? [ex.muscleGroup] : [],
+    primaryMuscles: customSlugs.length > 0 ? customSlugs : (ex.muscleGroup ? [ex.muscleGroup] : []),
+    muscleSlugs: customSlugs.length > 0 ? customSlugs : (ex.muscleGroup ? [ex.muscleGroup] : []),
     hasSvg: false,
     instructions: ex.instructions || [],
     overview: ex.overview,

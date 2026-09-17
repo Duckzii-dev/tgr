@@ -50,7 +50,7 @@ export async function facets(req, res) {
 
   const dbExercises = await prisma.exercise.findMany({
     where: { OR: [{ userId: null }, { userId }] },
-    select: { muscleGroup: true, equipment: true },
+    select: { muscleGroup: true, equipment: true, muscleSlugs: true },
   });
 
   const muscleGroups = new Set();
@@ -78,11 +78,24 @@ export async function facets(req, res) {
 }
 
 export async function createExercise(req, res) {
-  const { name, muscleGroup, equipment } = req.body;
+  const { name, muscleGroup, equipment, muscleSlugs } = req.body;
   if (!name || !muscleGroup) throw httpError(400, 'name and muscleGroup required');
+
+  // Validate muscleSlugs là array string
+  const slugs = Array.isArray(muscleSlugs)
+    ? muscleSlugs.filter((s) => typeof s === 'string' && s.length > 0)
+    : [];
+
   try {
     const exercise = await prisma.exercise.create({
-      data: { name, muscleGroup, equipment, isCustom: true, userId: req.user.id },
+      data: {
+        name,
+        muscleGroup,
+        equipment: equipment || null,
+        muscleSlugs: slugs.length > 0 ? slugs : null,
+        isCustom: true,
+        userId: req.user.id,
+      },
     });
     res.status(201).json({ exercise });
   } catch {
@@ -90,18 +103,43 @@ export async function createExercise(req, res) {
   }
 }
 
+export async function updateExercise(req, res) {
+  const userId = req.user.id;
+  const { id } = req.params;
+  const { name, muscleGroup, equipment, muscleSlugs } = req.body;
+
+  const existing = await prisma.exercise.findFirst({
+    where: { id, userId, isCustom: true },
+  });
+  if (!existing) throw httpError(404, 'Custom exercise not found');
+
+  const slugs = Array.isArray(muscleSlugs)
+    ? muscleSlugs.filter((s) => typeof s === 'string' && s.length > 0)
+    : null;
+
+  const updated = await prisma.exercise.update({
+    where: { id },
+    data: {
+      name: name ?? existing.name,
+      muscleGroup: muscleGroup ?? existing.muscleGroup,
+      equipment: equipment ?? existing.equipment,
+      muscleSlugs: slugs !== null ? (slugs.length > 0 ? slugs : null) : existing.muscleSlugs,
+    },
+  });
+
+  res.json({ exercise: updated });
+}
+
 export async function getExercise(req, res) {
   const userId = req.user.id;
   const { id } = req.params;
 
-  // Anatome exercise
   if (id.startsWith('anatome:')) {
     const ex = await getUnifiedExercise(userId, id);
     if (!ex) throw httpError(404, 'Exercise not found');
     return res.json({ exercise: ex, stats: null, prs: [], sessions: [], muscleContributions: [] });
   }
 
-  // DB exercise
   const exercise = await prisma.exercise.findFirst({
     where: { id, OR: [{ userId: null }, { userId }] },
   });
@@ -170,6 +208,9 @@ export async function getExercise(req, res) {
     .map(([mg, weight]) => ({ muscleGroup: mg, label: labelFor(mg), weight }))
     .sort((a, b) => b.weight - a.weight);
 
+  // Custom muscle slugs
+  const customSlugs = Array.isArray(exercise.muscleSlugs) ? exercise.muscleSlugs : [];
+
   res.json({
     exercise: {
       id: exercise.id,
@@ -181,6 +222,7 @@ export async function getExercise(req, res) {
       imageUrl: exercise.imageUrl,
       overview: exercise.overview,
       instructions: exercise.instructions,
+      muscleSlugs: customSlugs,
       source: 'db',
     },
     muscleContributions,

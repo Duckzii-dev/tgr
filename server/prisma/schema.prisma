@@ -65,6 +65,7 @@ model Exercise {
   variations         Json?
   keywords           Json?
   relatedExerciseIds Json?
+  muscleSlugs        Json?
 
   user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutExercises WorkoutExercise[]
