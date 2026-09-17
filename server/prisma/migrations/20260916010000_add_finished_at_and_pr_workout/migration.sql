@@ -9,9 +9,14 @@ ALTER TABLE `Workout`
 
 CREATE INDEX `Workout_finishedAt_idx` ON `Workout`(`finishedAt`);
 
--- 2. User.timezone
+-- 2. User.timezone — NULL trước, backfill, rồi NOT NULL
 ALTER TABLE `User`
-  ADD COLUMN `timezone` VARCHAR(191) NOT NULL DEFAULT 'UTC';
+  ADD COLUMN `timezone` VARCHAR(191) NULL;
+
+UPDATE `User` SET `timezone` = 'UTC' WHERE `timezone` IS NULL;
+
+ALTER TABLE `User`
+  MODIFY COLUMN `timezone` VARCHAR(191) NOT NULL DEFAULT 'UTC';
 
 -- 3. PersonalRecord.workoutId
 ALTER TABLE `PersonalRecord`
@@ -24,6 +29,10 @@ ALTER TABLE `PersonalRecord`
 
 CREATE INDEX `PersonalRecord_workoutId_idx` ON `PersonalRecord`(`workoutId`);
 
--- 4. Unique per (user, exercise, type)
+-- 4. Unique (userId, exerciseId, type)
 CREATE UNIQUE INDEX `PersonalRecord_userId_exerciseId_type_key`
   ON `PersonalRecord`(`userId`, `exerciseId`, `type`);
+
+CREATE INDEX `PersonalRecord_userId_idx` ON `PersonalRecord`(`userId`);
+CREATE INDEX `PersonalRecord_exerciseId_idx` ON `PersonalRecord`(`exerciseId`);
+CREATE INDEX `PersonalRecord_achievedAt_idx` ON `PersonalRecord`(`achievedAt`);

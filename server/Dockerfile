@@ -17,7 +17,7 @@
     # ---------- Stage 2: server runtime ----------
     FROM node:20-alpine
     
-    RUN apk add --no-cache openssl
+    RUN apk add --no-cache openssl mysql-client
     
     WORKDIR /app
     

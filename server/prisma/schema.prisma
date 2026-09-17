@@ -8,22 +8,22 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
+  id            String    @id @default(cuid())
+  email         String    @unique
   passwordHash  String?
   name          String?
-  googleId      String?  @unique
-  emailVerified Boolean  @default(false)
+  googleId      String?   @unique
+  emailVerified Boolean   @default(false)
   avatarUrl     String?
-  timezone      String   @default("UTC")
-  role          String   @default("user")   // 'user' | 'admin'
-  isBanned      Boolean  @default(false)
+  timezone      String    @default("UTC")
+  role          String    @default("user")
+  isBanned      Boolean   @default(false)
   bannedAt      DateTime?
-  bannedReason  String?  @db.Text
+  bannedReason  String?   @db.Text
   lastLoginAt   DateTime?
   lastLoginIp   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   workouts          Workout[]
   bodyWeights       BodyWeight[]
@@ -205,16 +205,12 @@ model PersonalRecord {
   @@index([workoutId])
 }
 
-// ============================================================
-// ADMIN MODELS
-// ============================================================
-
 model IpBlock {
-  id        String   @id @default(cuid())
-  ip        String   @unique
-  reason    String?  @db.Text
+  id        String    @id @default(cuid())
+  ip        String    @unique
+  reason    String?   @db.Text
   createdBy String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   expiresAt DateTime?
 
   @@index([ip])
@@ -225,8 +221,8 @@ model AuditLog {
   id         String   @id @default(cuid())
   actorId    String?
   actorEmail String?
-  action     String   // 'user.ban', 'user.delete', 'ip.block', ...
-  targetType String?  // 'User', 'IpBlock', 'Workout'
+  action     String
+  targetType String?
   targetId   String?
   meta       Json?
   ip         String?
