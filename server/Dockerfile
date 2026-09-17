@@ -30,10 +30,12 @@
     COPY server/src ./src
     COPY server/public ./public
     COPY server/scripts ./scripts
+    COPY server/docker-entrypoint.sh ./docker-entrypoint.sh
     
     COPY --from=client-builder /client/dist /client/dist
     
+    RUN chmod +x /app/docker-entrypoint.sh
+    
     EXPOSE 4000
     
-    # Auto-migrate trước khi start. Idempotent — chạy nhiều lần vẫn OK.
-    CMD ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]
+    CMD ["/app/docker-entrypoint.sh"]
