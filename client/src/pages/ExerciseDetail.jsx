@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Play, Activity, BookOpen } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { Plus, Activity, ArrowLeft, Info } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import Skeleton from '../components/Skeleton.jsx';
@@ -17,6 +17,7 @@ export default function ExerciseDetail() {
   const { id } = useParams();
   const [tab, setTab] = useState('Overview');
   const [range, setRange] = useState('3M');
+
   const { data, loading, error, refresh } = useFetch(
     () => api.get(`/exercises/${encodeURIComponent(id)}`),
     [id]
@@ -65,26 +66,55 @@ export default function ExerciseDetail() {
   if (!data?.exercise) return <Empty title="Exercise not found" />;
 
   const { exercise, stats, prs = [], sessions = [], muscleContributions } = data;
+  const isAnatome = exercise.source === 'anatome' || exercise.id?.startsWith('anatome:') || !stats;
 
-  // === Anatome exercise (không có stats) ===
-  if (!stats) {
-    return <AnatomeExerciseDetail exercise={exercise} />;
-  }
+  // Tính `displayStats` — nếu không có stats thật thì dùng empty
+  const displayStats = stats || {
+    currentBest: 0,
+    startingWeight: 0,
+    best1RM: 0,
+    best5: 0,
+    best10: 0,
+    totalSets: 0,
+    totalReps: 0,
+    totalSessions: 0,
+    totalVolume: 0,
+    maxWeight: 0,
+    avgRir: null,
+    avgRpe: null,
+    rirDistribution: {},
+    rpeProgression: [],
+  };
 
-  // === DB exercise (có stats đầy đủ) ===
   return (
     <div className="space-y-4">
+      {/* Back link */}
+      <Link to="/exercises" className="btn btn-ghost inline-flex">
+        <ArrowLeft className="w-4 h-4" /> Exercises
+      </Link>
+
+      {/* Header */}
       <div className="card p-4">
-        <h1 className="text-2xl font-semibold">{exercise.name}</h1>
-        <div className="text-sm text-ink-400 capitalize">
-          {exercise.muscleGroup} · {exercise.equipment || '—'}
-          {exercise.exerciseType ? ` · ${exercise.exerciseType}` : ''}
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-semibold">{exercise.name}</h1>
+            <div className="text-sm text-ink-400 capitalize">
+              {exercise.muscleGroup || exercise.bodyPart || '—'}
+              {exercise.equipment && <span> · {exercise.equipment}</span>}
+              {isAnatome && (
+                <span className="ml-2 chip text-[10px] border-accent/40">
+                  Anatome
+                </span>
+              )}
+            </div>
+            {exercise.overview && (
+              <p className="text-sm text-ink-300 mt-3">{exercise.overview}</p>
+            )}
+          </div>
         </div>
-        {exercise.overview && (
-          <p className="text-sm text-ink-300 mt-3">{exercise.overview}</p>
-        )}
       </div>
 
+      {/* Muscle contributions (DB exercises) */}
       {muscleContributions && muscleContributions.length > 0 && (
         <div className="card p-4">
           <div className="font-semibold mb-3">Muscles Worked</div>
@@ -98,10 +128,7 @@ export default function ExerciseDetail() {
                 <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{
-                      width: `${c.weight * 100}%`,
-                      background: '#c6ff3d',
-                    }}
+                    style={{ width: `${c.weight * 100}%`, background: '#c6ff3d' }}
                   />
                 </div>
               </div>
@@ -110,8 +137,28 @@ export default function ExerciseDetail() {
         </div>
       )}
 
-      <StrengthLevelCard exerciseId={exercise.id} />
+      {/* Muscle slugs (Anatome exercises) */}
+      {isAnatome && exercise.muscleSlugs?.length > 0 && (
+        <div className="card p-4">
+          <div className="font-semibold mb-3">Muscles Worked</div>
+          <div className="flex flex-wrap gap-1.5">
+            {exercise.muscleSlugs.map((slug) => (
+              <span key={slug} className="chip border-accent text-accent capitalize">
+                <Activity className="w-3 h-3" />
+                {slug.replace(/-/g, ' ')}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
+      {/* Strength Level (chỉ DB có) */}
+      {!isAnatome && <StrengthLevelCard exerciseId={exercise.id} />}
+
+      {/* Muscle Map — cho cả Anatome và DB có media */}
+      {isAnatome && <MuscleMapSection exercise={exercise} />}
+
+      {/* Video */}
       {exercise.videoUrl && (
         <div className="card p-0 overflow-hidden">
           <video
@@ -126,7 +173,8 @@ export default function ExerciseDetail() {
         </div>
       )}
 
-      {!exercise.videoUrl && exercise.imageUrl && (
+      {/* Image (DB, non-video) */}
+      {!isAnatome && !exercise.videoUrl && exercise.imageUrl && (
         <div className="card p-0 overflow-hidden">
           <img
             src={exercise.imageUrl}
@@ -136,44 +184,72 @@ export default function ExerciseDetail() {
         </div>
       )}
 
+      {/* Instructions */}
       {Array.isArray(exercise.instructions) && exercise.instructions.length > 0 && (
         <div className="card p-4">
           <div className="font-semibold mb-2">Cách thực hiện</div>
           <ol className="list-decimal ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.instructions.map((s, i) => (<li key={i}>{s}</li>))}
+            {exercise.instructions.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
           </ol>
         </div>
       )}
 
+      {/* Tips (DB) */}
       {Array.isArray(exercise.exerciseTips) && exercise.exerciseTips.length > 0 && (
         <div className="card p-4">
           <div className="font-semibold mb-2">Tips</div>
           <ul className="list-disc ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.exerciseTips.map((s, i) => (<li key={i}>{s}</li>))}
+            {exercise.exerciseTips.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
           </ul>
         </div>
       )}
 
+      {/* Variations (DB) */}
       {Array.isArray(exercise.variations) && exercise.variations.length > 0 && (
         <div className="card p-4">
           <div className="font-semibold mb-2">Biến thể</div>
           <ul className="list-disc ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.variations.map((s, i) => (<li key={i}>{s}</li>))}
+            {exercise.variations.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
           </ul>
         </div>
       )}
 
+      {/* Notice for Anatome without data */}
+      {isAnatome && displayStats.totalSets === 0 && (
+        <div className="card p-4 border-accent/30">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+            <div className="text-sm text-ink-300">
+              <strong className="text-white">Chưa có dữ liệu tập luyện.</strong>
+              <br />
+              Log bài tập này trong buổi tập để theo dõi tiến độ, PR, RIR/RPE và các chỉ số khác.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats — luôn hiển thị, dùng 0 nếu chưa có */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Current Best" value={`${stats.currentBest}kg`} />
-        <StatCard label="Starting" value={`${stats.startingWeight}kg`} />
-        <StatCard label="Best 1RM (est)" value={`${fmtNumber(stats.best1RM, 1)}kg`} />
-        <StatCard label="Best 5 reps" value={`${stats.best5}kg`} />
-        <StatCard label="Best 10 reps" value={`${stats.best10}kg`} />
-        <StatCard label="Total Sets" value={stats.totalSets} />
-        <StatCard label="Total Reps" value={fmtNumber(stats.totalReps)} />
-        <StatCard label="Sessions" value={stats.totalSessions} />
+        <StatCard label="Current Best" value={`${displayStats.currentBest || 0}kg`} />
+        <StatCard label="Starting" value={`${displayStats.startingWeight || 0}kg`} />
+        <StatCard
+          label="Best 1RM (est)"
+          value={`${fmtNumber(displayStats.best1RM, 1)}kg`}
+        />
+        <StatCard label="Best 5 reps" value={`${displayStats.best5 || 0}kg`} />
+        <StatCard label="Best 10 reps" value={`${displayStats.best10 || 0}kg`} />
+        <StatCard label="Total Sets" value={displayStats.totalSets || 0} />
+        <StatCard label="Total Reps" value={fmtNumber(displayStats.totalReps || 0)} />
+        <StatCard label="Sessions" value={displayStats.totalSessions || 0} />
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-1 border-b border-ink-700 overflow-x-auto">
         {TABS.map((t) => (
           <button
@@ -190,6 +266,7 @@ export default function ExerciseDetail() {
         ))}
       </div>
 
+      {/* Tab: Overview */}
       {tab === 'Overview' && (
         <div className="space-y-3">
           <div className="flex gap-1 flex-wrap">
@@ -203,36 +280,41 @@ export default function ExerciseDetail() {
               </button>
             ))}
           </div>
-          <div className="grid lg:grid-cols-2 gap-3">
-            <div className="card p-4">
-              <div className="text-sm mb-2 text-ink-300">Weight over time</div>
-              <LineChartCard data={progression} lines={[{ key: 'maxWeight', name: 'kg' }]} />
+          {progression.length > 0 ? (
+            <div className="grid lg:grid-cols-2 gap-3">
+              <div className="card p-4">
+                <div className="text-sm mb-2 text-ink-300">Weight over time</div>
+                <LineChartCard data={progression} lines={[{ key: 'maxWeight', name: 'kg' }]} />
+              </div>
+              <div className="card p-4">
+                <div className="text-sm mb-2 text-ink-300">Estimated 1RM over time</div>
+                <LineChartCard
+                  data={progression}
+                  lines={[{ key: 'estimated1RM', name: '1RM', color: '#ffb038' }]}
+                />
+              </div>
+              <div className="card p-4">
+                <div className="text-sm mb-2 text-ink-300">Volume over time</div>
+                <LineChartCard
+                  data={progression}
+                  lines={[{ key: 'volume', name: 'kg', color: '#5ed3ff' }]}
+                />
+              </div>
+              <div className="card p-4">
+                <div className="text-sm mb-2 text-ink-300">Reps over time</div>
+                <LineChartCard
+                  data={progression}
+                  lines={[{ key: 'reps', name: 'reps', color: '#b494ff' }]}
+                />
+              </div>
             </div>
-            <div className="card p-4">
-              <div className="text-sm mb-2 text-ink-300">Estimated 1RM over time</div>
-              <LineChartCard
-                data={progression}
-                lines={[{ key: 'estimated1RM', name: '1RM', color: '#ffb038' }]}
-              />
-            </div>
-            <div className="card p-4">
-              <div className="text-sm mb-2 text-ink-300">Volume over time</div>
-              <LineChartCard
-                data={progression}
-                lines={[{ key: 'volume', name: 'kg', color: '#5ed3ff' }]}
-              />
-            </div>
-            <div className="card p-4">
-              <div className="text-sm mb-2 text-ink-300">Reps over time</div>
-              <LineChartCard
-                data={progression}
-                lines={[{ key: 'reps', name: 'reps', color: '#b494ff' }]}
-              />
-            </div>
-          </div>
+          ) : (
+            <Empty title="Chưa có dữ liệu" hint="Log workout để xem biểu đồ." />
+          )}
         </div>
       )}
 
+      {/* Tab: History */}
       {tab === 'History' &&
         (sessions.length ? (
           <div className="space-y-2">
@@ -256,35 +338,45 @@ export default function ExerciseDetail() {
             ))}
           </div>
         ) : (
-          <Empty title="No history yet" />
+          <Empty title="Chưa có lịch sử" hint="Log workout để bắt đầu." />
         ))}
 
+      {/* Tab: Progression */}
       {tab === 'Progression' && (
-        <div className="card p-4">
-          <div className="text-sm mb-2 text-ink-300">Weight progression</div>
-          <LineChartCard data={progression} lines={[{ key: 'maxWeight', name: 'kg' }]} height={320} />
-        </div>
+        progression.length > 0 ? (
+          <div className="card p-4">
+            <div className="text-sm mb-2 text-ink-300">Weight progression</div>
+            <LineChartCard
+              data={progression}
+              lines={[{ key: 'maxWeight', name: 'kg' }]}
+              height={320}
+            />
+          </div>
+        ) : (
+          <Empty title="Chưa có dữ liệu" />
+        )
       )}
 
+      {/* Tab: Intensity */}
       {tab === 'Intensity' && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <StatCard
               label="Avg RIR"
-              value={stats.avgRir != null ? stats.avgRir.toFixed(2) : '—'}
+              value={displayStats.avgRir != null ? displayStats.avgRir.toFixed(2) : '—'}
               sub="Lower = closer to failure"
             />
             <StatCard
               label="Avg RPE"
-              value={stats.avgRpe != null ? stats.avgRpe.toFixed(2) : '—'}
+              value={displayStats.avgRpe != null ? displayStats.avgRpe.toFixed(2) : '—'}
               sub="10 = max effort"
             />
           </div>
-          {stats.rpeProgression?.length > 0 ? (
+          {displayStats.rpeProgression?.length > 0 ? (
             <div className="card p-4">
               <div className="text-sm mb-2 text-ink-300">RIR / RPE over time</div>
               <LineChartCard
-                data={stats.rpeProgression}
+                data={displayStats.rpeProgression}
                 xKey="date"
                 lines={[
                   { key: 'avgRir', name: 'RIR', color: '#c6ff3d' },
@@ -294,16 +386,16 @@ export default function ExerciseDetail() {
               />
             </div>
           ) : (
-            <Empty title="No RIR/RPE data" hint="Log RIR or RPE in sets to see trend." />
+            <Empty title="Chưa có RIR/RPE" hint="Log RIR hoặc RPE trong sets." />
           )}
-          {Object.keys(stats.rirDistribution || {}).length > 0 && (
+          {Object.keys(displayStats.rirDistribution || {}).length > 0 && (
             <div className="card p-4">
               <div className="font-semibold mb-3">RIR Distribution</div>
               <div className="space-y-2">
-                {Object.entries(stats.rirDistribution)
+                {Object.entries(displayStats.rirDistribution)
                   .sort(([a], [b]) => Number(a) - Number(b))
                   .map(([rir, count]) => {
-                    const max = Math.max(...Object.values(stats.rirDistribution));
+                    const max = Math.max(...Object.values(displayStats.rirDistribution));
                     return (
                       <div key={rir}>
                         <div className="flex justify-between text-xs mb-1">
@@ -325,6 +417,7 @@ export default function ExerciseDetail() {
         </div>
       )}
 
+      {/* Tab: PRs */}
       {tab === 'PRs' &&
         (prs.length ? (
           <div className="space-y-2">
@@ -342,22 +435,19 @@ export default function ExerciseDetail() {
             ))}
           </div>
         ) : (
-          <Empty title="No PRs yet" />
+          <Empty title="Chưa có PR" hint="Log workout để phá kỷ lục." />
         ))}
     </div>
   );
 }
 
-// ============================================================
-// Anatome exercise detail — không có stats
-// ============================================================
-function AnatomeExerciseDetail({ exercise }) {
+function MuscleMapSection({ exercise }) {
   const [svg, setSvg] = useState(null);
   const [svgLoading, setSvgLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    // svgId là tên file gốc (không có prefix anatome:)
     const rawId = exercise.svgId || String(exercise.id).replace(/^anatome:/, '');
     const slug = rawId.replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
     const url = `/static/muscle-maps/${slug}.svg`;
@@ -376,75 +466,34 @@ function AnatomeExerciseDetail({ exercise }) {
         setSvg(cleaned);
         setSvgLoading(false);
       })
-      .catch((e) => {
-        if (cancelled) return;
-        console.error('SVG load failed:', url, e.message);
-        setSvgLoading(false);
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          setSvgLoading(false);
+        }
       });
     return () => { cancelled = true; };
   }, [exercise.id, exercise.svgId]);
 
   return (
-    <div className="space-y-4">
-      <div className="card p-4">
-        <h1 className="text-2xl font-semibold">{exercise.name}</h1>
-        <div className="text-sm text-ink-400 capitalize">
-          {exercise.bodyPart && <span>{exercise.bodyPart}</span>}
-          {exercise.equipment && <span> · {exercise.equipment}</span>}
-          <span className="ml-2 chip text-[10px]">Anatome</span>
-        </div>
-      </div>
-
-      {exercise.muscleSlugs?.length > 0 && (
-        <div className="card p-4">
-          <div className="font-semibold mb-3">Muscles Worked</div>
-          <div className="flex flex-wrap gap-1.5">
-            {exercise.muscleSlugs.map((slug) => (
-              <span key={slug} className="chip border-accent text-accent capitalize">
-                <Activity className="w-3 h-3" />
-                {slug.replace(/-/g, ' ')}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="card p-4">
-        <div className="font-semibold mb-3">Muscle Map</div>
-        <div className="bg-ink-950 rounded-xl p-6 flex items-center justify-center min-h-[500px]">
-          {svgLoading ? (
-            <div className="text-xs text-ink-500 animate-pulse">Loading muscle map...</div>
-          ) : svg ? (
-            <div
-              style={{ width: '100%', maxWidth: '500px' }}
-              dangerouslySetInnerHTML={{
-                __html: svg.replace(
-                  /<svg([^>]*)>/,
-                  '<svg$1 style="width:100%;height:auto;display:block;">'
-                ),
-              }}
-            />
-          ) : (
-            <div className="text-xs text-ink-500">No muscle map available</div>
-          )}
-        </div>
-      </div>
-
-      {exercise.instructions?.length > 0 && (
-        <div className="card p-4">
-          <div className="font-semibold mb-2">Cách thực hiện</div>
-          <ol className="list-decimal ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.instructions.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      <div className="card p-4">
-        <div className="text-sm text-ink-400 text-center">
-          Đây là bài tập từ Anatome library. Log workout để theo dõi tiến độ.
-        </div>
+    <div className="card p-4">
+      <div className="font-semibold mb-3">Muscle Map</div>
+      <div className="bg-ink-950 rounded-xl p-6 flex items-center justify-center min-h-[500px]">
+        {svgLoading ? (
+          <div className="text-xs text-ink-500 animate-pulse">Loading muscle map...</div>
+        ) : svg ? (
+          <div
+            style={{ width: '100%', maxWidth: '500px' }}
+            dangerouslySetInnerHTML={{
+              __html: svg.replace(
+                /<svg([^>]*)>/,
+                '<svg$1 style="width:100%;height:auto;display:block;">'
+              ),
+            }}
+          />
+        ) : (
+          <div className="text-xs text-ink-500">No muscle map available</div>
+        )}
       </div>
     </div>
   );
