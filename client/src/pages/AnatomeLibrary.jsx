@@ -1,19 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Search, Filter, X, Play, Activity, BookOpen } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Search, Filter, X, Play, Activity, BookOpen, Loader } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
+import { useInfiniteExercises } from '../hooks/useInfiniteExercises.js';
 import Skeleton from '../components/Skeleton.jsx';
 import Empty from '../components/Empty.jsx';
 import Modal from '../components/Modal.jsx';
+import LazySvg from '../components/LazySvg.jsx';
 import { fmtNumber } from '../lib/format.js';
-
-function slugifyId(id) {
-  return String(id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-function getLocalMapUrl(exId) {
-  return `/static/muscle-maps/${slugifyId(exId)}.svg`;
-}
+import { svgUrl, fetchSvg } from '../lib/svgUtils.js';
 
 export default function AnatomeLibrary() {
   const [q, setQ] = useState('');
@@ -24,19 +19,31 @@ export default function AnatomeLibrary() {
   const facets = useFetch(() => api.get('/anatome/facets'), []);
   const meta = useFetch(() => api.get('/anatome/meta'), []);
 
-  const { data, loading } = useFetch(
-    () => {
-      const p = new URLSearchParams();
-      if (q) p.set('q', q);
-      if (muscleSlug) p.set('muscleSlug', muscleSlug);
-      p.set('limit', '100');
-      return api.get(`/anatome/exercises?${p}`);
-    },
-    [q, muscleSlug]
-  );
+  const { items, total, loading, error, hasMore, loadMore } = useInfiniteExercises({
+    q,
+    muscleSlug,
+  });
 
-  const exercises = data?.exercises || [];
-  const total = data?.total || 0;
+  const sentinelRef = useRef(null);
+
+  // Infinite scroll với IntersectionObserver
+  useEffect(() => {
+    if (!hasMore || loading) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '400px' }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadMore]);
 
   return (
     <div className="space-y-4">
@@ -95,22 +102,51 @@ export default function AnatomeLibrary() {
         )}
       </div>
 
-      {loading ? (
+      {error && (
+        <div className="card p-4 text-red-400 text-sm">
+          {error}{' '}
+          <button className="underline ml-2" onClick={() => loadMore()}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {items.length === 0 && loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {Array.from({ length: 12 }).map((_, i) => (
             <Skeleton key={i} className="h-60" />
           ))}
         </div>
-      ) : exercises.length ? (
+      ) : items.length ? (
         <>
           <div className="text-xs text-ink-400">
-            Hiện {exercises.length} / {total} bài tập
+            Hiện {items.length} / {total} bài tập
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {exercises.map((ex) => (
+            {items.map((ex) => (
               <ExerciseCard key={ex.id} ex={ex} onClick={() => setDetail(ex)} />
             ))}
           </div>
+
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-6">
+              {loading ? (
+                <div className="flex items-center gap-2 text-ink-400 text-sm">
+                  <Loader className="w-4 h-4 animate-spin" /> Đang tải thêm...
+                </div>
+              ) : (
+                <button className="btn btn-ghost" onClick={loadMore}>
+                  Load more
+                </button>
+              )}
+            </div>
+          )}
+
+          {!hasMore && items.length >= total && total > 50 && (
+            <div className="text-center text-xs text-ink-500 py-4">
+              Đã hiển thị toàn bộ {total} bài tập
+            </div>
+          )}
         </>
       ) : (
         <Empty title="Không tìm thấy bài tập" hint="Thử đổi từ khoá." icon={Search} />
@@ -129,53 +165,13 @@ export default function AnatomeLibrary() {
 }
 
 function ExerciseCard({ ex, onClick }) {
-  const [svg, setSvg] = useState(null);
-  const [svgLoading, setSvgLoading] = useState(true);
-  const mapUrl = getLocalMapUrl(ex.id);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(mapUrl)
-      .then((r) => r.text())
-      .then((text) => {
-        if (cancelled) return;
-        // Strip xml declaration + comment
-        const cleaned = text
-          .replace(/<\?xml[^?]*\?>/g, '')
-          .replace(/<!--[\s\S]*?-->/g, '')
-          .trim();
-        setSvg(cleaned);
-        setSvgLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) setSvgLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [mapUrl]);
-
   return (
     <button
       onClick={onClick}
       className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
     >
-      {/* SVG preview */}
-      <div className="relative bg-ink-950 rounded-lg h-40 flex items-center justify-center overflow-hidden">
-        {svgLoading ? (
-          <div className="text-xs text-ink-500">Loading...</div>
-        ) : svg ? (
-          <div
-            className="w-full h-full flex items-center justify-center p-2"
-            style={{ maxHeight: '160px' }}
-            dangerouslySetInnerHTML={{
-              __html: svg.replace(
-                /<svg([^>]*)>/,
-                '<svg$1 style="max-width:100%;max-height:150px;width:auto;height:auto;">'
-              ),
-            }}
-          />
-        ) : (
-          <div className="text-xs text-ink-500">No preview</div>
-        )}
+      <div className="relative bg-ink-950 rounded-lg h-40 overflow-hidden">
+        <LazySvg exerciseId={ex.id} className="w-full h-full p-2" />
       </div>
 
       <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
@@ -196,85 +192,67 @@ function ExerciseDetailContent({ ex }) {
   const [svg, setSvg] = useState(null);
   const [svgLoading, setSvgLoading] = useState(true);
   const [hoveredMuscle, setHoveredMuscle] = useState(null);
-  const mapUrl = getLocalMapUrl(ex.id);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(mapUrl)
-      .then((r) => r.text())
+    fetchSvg(ex.id)
       .then((text) => {
-        if (cancelled) return;
-        const cleaned = text
-          .replace(/<\?xml[^?]*\?>/g, '')
-          .replace(/<!--[\s\S]*?-->/g, '')
-          .trim();
-        setSvg(cleaned);
-        setSvgLoading(false);
+        if (!cancelled) {
+          setSvg(text);
+          setSvgLoading(false);
+        }
       })
       .catch(() => setSvgLoading(false));
     return () => { cancelled = true; };
-  }, [mapUrl]);
-
-  // Highlight muscle khi hover vào pill
-  const handleMuscleHover = (muscleLabel) => {
-    if (!svg) return;
-    setHoveredMuscle(muscleLabel);
-  };
+  }, [ex.id]);
 
   return (
     <div className="space-y-4">
-      {/* Muscles info */}
-      <div className="space-y-3">
-        {ex.primaryMuscles?.length > 0 && (
-          <div>
-            <div className="label">Primary Muscles</div>
-            <div className="flex flex-wrap gap-1.5">
-              {ex.primaryMuscles.map((m) => (
-                <button
-                  key={m}
-                  className={`chip ${
-                    hoveredMuscle === m ? 'border-accent text-accent' : ''
-                  }`}
-                  onMouseEnter={() => handleMuscleHover(m)}
-                  onMouseLeave={() => handleMuscleHover(null)}
-                >
-                  <Activity className="w-3 h-3" /> {m}
-                </button>
-              ))}
-            </div>
+      {ex.primaryMuscles?.length > 0 && (
+        <div>
+          <div className="label">Primary Muscles</div>
+          <div className="flex flex-wrap gap-1.5">
+            {ex.primaryMuscles.map((m) => (
+              <button
+                key={m}
+                className={`chip ${
+                  hoveredMuscle === m ? 'border-accent text-accent' : ''
+                }`}
+                onMouseEnter={() => setHoveredMuscle(m)}
+                onMouseLeave={() => setHoveredMuscle(null)}
+              >
+                <Activity className="w-3 h-3" /> {m}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {ex.secondaryMuscles?.length > 0 && (
-          <div>
-            <div className="label">Secondary Muscles</div>
-            <div className="flex flex-wrap gap-1.5">
-              {ex.secondaryMuscles.map((m) => (
-                <button
-                  key={m}
-                  className="chip text-ink-400"
-                  onMouseEnter={() => handleMuscleHover(m)}
-                  onMouseLeave={() => handleMuscleHover(null)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+      {ex.secondaryMuscles?.length > 0 && (
+        <div>
+          <div className="label">Secondary Muscles</div>
+          <div className="flex flex-wrap gap-1.5">
+            {ex.secondaryMuscles.map((m) => (
+              <button
+                key={m}
+                className="chip text-ink-400"
+                onMouseEnter={() => setHoveredMuscle(m)}
+                onMouseLeave={() => setHoveredMuscle(null)}
+              >
+                {m}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* SVG Diagram — to, nổi bật */}
       <div>
         <div className="label mb-2">Muscle Map</div>
         <div className="bg-ink-950 rounded-xl p-6 flex items-center justify-center min-h-[500px]">
           {svgLoading ? (
-            <div className="text-xs text-ink-500 animate-pulse">
-              Loading muscle map...
-            </div>
+            <div className="text-xs text-ink-500 animate-pulse">Loading...</div>
           ) : svg ? (
             <div
-              className="max-w-full"
               style={{ width: '100%', maxWidth: '500px' }}
               dangerouslySetInnerHTML={{
                 __html: svg.replace(
@@ -284,12 +262,11 @@ function ExerciseDetailContent({ ex }) {
               }}
             />
           ) : (
-            <div className="text-xs text-ink-500">No muscle map available</div>
+            <div className="text-xs text-ink-500">No muscle map</div>
           )}
         </div>
       </div>
 
-      {/* Instructions */}
       {ex.instructions?.length > 0 && (
         <div>
           <div className="label">Instructions</div>
@@ -301,18 +278,15 @@ function ExerciseDetailContent({ ex }) {
         </div>
       )}
 
-      {/* Video */}
       {ex.videoUrl && (
-        <div>
-          <a
-            href={ex.videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-ghost w-full justify-center"
-          >
-            <Play className="w-4 h-4" /> Watch on YouTube
-          </a>
-        </div>
+        <a
+          href={ex.videoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-ghost w-full justify-center"
+        >
+          <Play className="w-4 h-4" /> Watch on YouTube
+        </a>
       )}
     </div>
   );
