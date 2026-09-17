@@ -15,6 +15,7 @@ const PAGE_SIZE = 50;
 
 const SOURCE_TABS = [
   { key: 'all', label: 'All' },
+  { key: 'trained', label: 'Trained' },
   { key: 'custom', label: 'Custom' },
 ];
 
@@ -86,7 +87,8 @@ export default function Exercises() {
     p.set('offset', String(offset));
 
     try {
-      const res = await api.get(`/exercises?${p}`);
+      const endpoint = tab === 'trained' ? '/exercises/trained' : '/exercises';
+      const res = await api.get(`${endpoint}?${p}`);
       if (reqId !== requestIdRef.current) return;
 
       const list = res.exercises || [];
@@ -264,7 +266,7 @@ export default function Exercises() {
                 </div>
 
                 <div className="flex flex-wrap gap-1">
-                  {ex.source && (
+                  {ex.source && tab !== 'trained' && (
                     <span className="chip text-[10px] capitalize">{ex.source}</span>
                   )}
                   {ex.bodyPart && (
@@ -279,6 +281,32 @@ export default function Exercises() {
                     <span className="chip text-[10px] border-accent text-accent">custom</span>
                   )}
                 </div>
+
+                {/* Stats cho tab trained */}
+                {tab === 'trained' && (
+                  <div className="grid grid-cols-3 gap-2 text-[10px] pt-2 border-t border-ink-700">
+                    <div className="text-center">
+                      <div className="text-white font-semibold">{ex.sessions || 0}</div>
+                      <div className="text-ink-400">sessions</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-white font-semibold">{ex.sets || 0}</div>
+                      <div className="text-ink-400">sets</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-white font-semibold">
+                        {fmtNumber((ex.volume || 0) / 1000, 1)}t
+                      </div>
+                      <div className="text-ink-400">volume</div>
+                    </div>
+                  </div>
+                )}
+
+                {tab === 'trained' && ex.lastTrainedAt && (
+                  <div className="text-[10px] text-ink-500 text-center">
+                    Last: {new Date(ex.lastTrainedAt).toLocaleDateString()}
+                  </div>
+                )}
               </button>
             ))}
           </div>

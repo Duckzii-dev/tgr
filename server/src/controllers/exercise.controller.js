@@ -239,6 +239,123 @@ export async function getExercise(req, res) {
   });
 }
 
+
+/**
+ * GET /api/exercises/trained
+ * Danh sách exercise user đã tập ít nhất 1 set.
+ * Sort: lastTrainedAt DESC.
+ */
+export async function listTrainedExercises(req, res) {
+  const userId = req.user.id;
+
+  // Lấy tất cả sets của user, group by exerciseId
+  const sets = await prisma.workoutSet.findMany({
+    where: {
+      isWarmup: false,
+      workoutExercise: { workout: { userId } },
+    },
+    select: {
+      weight: true,
+      reps: true,
+      estimated1RM: true,
+      workoutExercise: {
+        select: {
+          exerciseId: true,
+          exercise: {
+            select: {
+              id: true,
+              name: true,
+              muscleGroup: true,
+              equipment: true,
+              isCustom: true,
+              videoUrl: true,
+              imageUrl: true,
+              muscleSlugs: true,
+            },
+          },
+          workout: {
+            select: {
+              id: true,
+              date: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { workoutExercise: { workout: { date: 'desc' } } },
+  });
+
+  // Aggregate per exercise
+  const stats = new Map();
+
+  for (const s of sets) {
+    const ex = s.workoutExercise.exercise;
+    if (!ex) continue;
+
+    const existing = stats.get(ex.id) || {
+      exercise: {
+        id: ex.id,
+        name: ex.name,
+        muscleGroup: ex.muscleGroup,
+        bodyPart: ex.muscleGroup,
+        equipment: ex.equipment,
+        isCustom: ex.isCustom,
+        videoUrl: ex.videoUrl,
+        imageUrl: ex.imageUrl,
+        muscleSlugs: Array.isArray(ex.muscleSlugs) ? ex.muscleSlugs : [],
+        primaryMuscles: Array.isArray(ex.muscleSlugs) && ex.muscleSlugs.length
+          ? ex.muscleSlugs
+          : (ex.muscleGroup ? [ex.muscleGroup] : []),
+        source: ex.isCustom ? 'custom' : 'db',
+        hasSvg: false,
+      },
+      sets: 0,
+      reps: 0,
+      volume: 0,
+      best1RM: 0,
+      maxWeight: 0,
+      lastTrainedAt: null,
+      firstTrainedAt: null,
+      sessionsSet: new Set(),
+    };
+
+    existing.sets += 1;
+    existing.reps += s.reps;
+    existing.volume += s.weight * s.reps;
+    if (s.estimated1RM && s.estimated1RM > existing.best1RM) {
+      existing.best1RM = s.estimated1RM;
+    }
+    if (s.weight > existing.maxWeight) existing.maxWeight = s.weight;
+
+    const date = s.workoutExercise.workout.date;
+    if (!existing.lastTrainedAt || new Date(date) > new Date(existing.lastTrainedAt)) {
+      existing.lastTrainedAt = date;
+    }
+    if (!existing.firstTrainedAt || new Date(date) < new Date(existing.firstTrainedAt)) {
+      existing.firstTrainedAt = date;
+    }
+    existing.sessionsSet.add(s.workoutExercise.workout.id);
+
+    stats.set(ex.id, existing);
+  }
+
+  const list = [...stats.values()].map((item) => ({
+    ...item,
+    sessions: item.sessionsSet.size,
+    sessionsSet: undefined,
+    best1RM: +item.best1RM.toFixed(2),
+    volume: Math.round(item.volume),
+  }));
+
+  // Sort by lastTrainedAt DESC
+  list.sort((a, b) => new Date(b.lastTrainedAt) - new Date(a.lastTrainedAt));
+
+  res.json({
+    exercises: list,
+    total: list.length,
+  });
+}
+
 export async function deleteExercise(req, res) {
   const { id } = req.params;
   const exercise = await prisma.exercise.findFirst({
