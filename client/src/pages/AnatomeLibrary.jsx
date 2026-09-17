@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Search, X, Play, Activity, BookOpen, Loader, Filter } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Search, Activity, BookOpen, Loader, X } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import Skeleton from '../components/Skeleton.jsx';
@@ -19,13 +19,14 @@ const BODY_PARTS = [
   { key: 'triceps', label: 'Triceps' },
   { key: 'legs', label: 'Legs' },
   { key: 'core', label: 'Core' },
+  { key: 'forearms', label: 'Forearms' },
   { key: 'cardio', label: 'Cardio' },
   { key: 'stretch', label: 'Stretch' },
-  { key: 'other', label: 'Other' },
 ];
 
 export default function AnatomeLibrary() {
   const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
   const [bodyPart, setBodyPart] = useState('');
   const [detail, setDetail] = useState(null);
 
@@ -37,64 +38,94 @@ export default function AnatomeLibrary() {
 
   const offsetRef = useRef(0);
   const sentinelRef = useRef(null);
+  const requestIdRef = useRef(0);
 
   const meta = useFetch(() => api.get('/anatome/meta'), []);
 
-  // Reset khi filter đổi
+  // Debounce search
   useEffect(() => {
-    setItems([]);
-    setTotal(0);
-    setHasMore(true);
-    offsetRef.current = 0;
-    setError(null);
-  }, [q, bodyPart]);
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
-  const loadMore = async () => {
-    if (loading || !hasMore) return;
+  /**
+   * Load một page. `reset=true` → load từ đầu.
+   * Không dùng loading state để block, dùng requestId.
+   */
+  const loadPage = useCallback(async (reset) => {
+    const reqId = ++requestIdRef.current;
+
     setLoading(true);
+    setError(null);
 
-    const offset = offsetRef.current;
+    const offset = reset ? 0 : offsetRef.current;
+
     const p = new URLSearchParams();
-    if (q) p.set('q', q);
+    if (debouncedQ) p.set('q', debouncedQ);
     if (bodyPart) p.set('bodyPart', bodyPart);
     p.set('limit', String(PAGE_SIZE));
     p.set('offset', String(offset));
 
     try {
       const res = await api.get(`/anatome/exercises?${p}`);
+
+      // Ignore stale request
+      if (reqId !== requestIdRef.current) return;
+
       const list = res.exercises || [];
       const tot = res.total || 0;
-      setItems((prev) => (offset === 0 ? list : [...prev, ...list]));
+
+      if (reset) {
+        setItems(list);
+        offsetRef.current = list.length;
+      } else {
+        setItems((prev) => [...prev, ...list]);
+        offsetRef.current = offset + list.length;
+      }
+
       setTotal(tot);
-      offsetRef.current = offset + list.length;
-      setHasMore(offset + list.length < tot);
+      setHasMore((offset + list.length) < tot);
     } catch (e) {
+      if (reqId !== requestIdRef.current) return;
       setError(e.message);
     } finally {
-      setLoading(false);
+      if (reqId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [debouncedQ, bodyPart]);
 
+  // Load khi filter đổi — RESET FIRST, then load
   useEffect(() => {
-    if (offsetRef.current === 0 && items.length === 0) {
-      loadMore();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, bodyPart]);
+    setItems([]);
+    setTotal(0);
+    setHasMore(true);
+    offsetRef.current = 0;
+    setError(null);
 
+    // Force load ngay
+    loadPage(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQ, bodyPart]);
+
+  // Infinite scroll
   useEffect(() => {
     if (!hasMore || loading) return;
     const el = sentinelRef.current;
     if (!el) return;
+
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) loadMore();
+        if (entries[0].isIntersecting) {
+          loadPage(false);
+        }
       },
       { rootMargin: '400px' }
     );
+
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, loading, loadMore]);
+  }, [hasMore, loading, loadPage]);
 
   return (
     <div className="space-y-4">
@@ -123,19 +154,44 @@ export default function AnatomeLibrary() {
           {BODY_PARTS.map((bp) => (
             <button
               key={bp.key}
-              className={`chip ${bodyPart === bp.key ? 'border-accent text-accent' : ''}`}
+              className={`chip ${
+                bodyPart === bp.key
+                  ? 'border-accent text-accent bg-accent/10'
+                  : ''
+              }`}
               onClick={() => setBodyPart(bp.key)}
             >
               {bp.label}
             </button>
           ))}
         </div>
+
+        {(bodyPart || debouncedQ) && (
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-ink-700">
+            <div className="text-ink-400">
+              {bodyPart && <span className="capitalize font-medium text-accent">{bodyPart}</span>}
+              {debouncedQ && <span className="ml-2">· "{debouncedQ}"</span>}
+              <span className="ml-2">→ {total} kết quả</span>
+            </div>
+            <button
+              className="text-ink-400 hover:text-white flex items-center gap-1"
+              onClick={() => {
+                setBodyPart('');
+                setQ('');
+              }}
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
         <div className="card p-4 text-red-400 text-sm">
           {error}{' '}
-          <button className="underline ml-2" onClick={loadMore}>Retry</button>
+          <button className="underline ml-2" onClick={() => loadPage(true)}>
+            Retry
+          </button>
         </div>
       )}
 
@@ -150,6 +206,7 @@ export default function AnatomeLibrary() {
           <div className="text-xs text-ink-400">
             Hiện {items.length} / {total} bài tập
           </div>
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {items.map((ex) => (
               <button
@@ -167,7 +224,9 @@ export default function AnatomeLibrary() {
 
                 <div className="flex flex-wrap gap-1">
                   {ex.bodyPart && (
-                    <span className="chip text-[10px] capitalize">{ex.bodyPart}</span>
+                    <span className="chip text-[10px] capitalize">
+                      {ex.bodyPart}
+                    </span>
                   )}
                 </div>
 
@@ -185,10 +244,12 @@ export default function AnatomeLibrary() {
             <div ref={sentinelRef} className="flex justify-center py-6">
               {loading ? (
                 <div className="flex items-center gap-2 text-ink-400 text-sm">
-                  <Loader className="w-4 h-4 animate-spin" /> Đang tải...
+                  <Loader className="w-4 h-4 animate-spin" /> Đang tải thêm...
                 </div>
               ) : (
-                <button className="btn btn-ghost" onClick={loadMore}>Load more</button>
+                <button className="btn btn-ghost" onClick={() => loadPage(false)}>
+                  Load more
+                </button>
               )}
             </div>
           )}
@@ -199,9 +260,17 @@ export default function AnatomeLibrary() {
             </div>
           )}
         </>
-      ) : (
-        <Empty title="Không có bài tập" hint="Thử đổi filter." icon={Search} />
-      )}
+      ) : !loading ? (
+        <Empty
+          title="Không có bài tập"
+          hint={
+            bodyPart || debouncedQ
+              ? 'Không có kết quả cho bộ lọc này.'
+              : 'Chưa có dữ liệu.'
+          }
+          icon={Search}
+        />
+      ) : null}
 
       <Modal
         open={!!detail}
@@ -228,7 +297,7 @@ function ExerciseDetailContent({ ex }) {
         if (cancelled) return;
         const cleaned = text
           .replace(/<\?xml[^?]*\?>/g, '')
-          .replace(/<--- 38.46.226.72 ping statistics[\s\S]*?-->/g, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
           .trim();
         setSvg(cleaned);
         setSvgLoading(false);
@@ -239,6 +308,15 @@ function ExerciseDetailContent({ ex }) {
 
   return (
     <div className="space-y-4">
+      {ex.bodyPart && (
+        <div>
+          <div className="label">Body Part</div>
+          <span className="chip border-accent text-accent capitalize">
+            {ex.bodyPart}
+          </span>
+        </div>
+      )}
+
       {ex.primaryMuscles?.length > 0 && (
         <div>
           <div className="label">Primary Muscles</div>
@@ -272,17 +350,6 @@ function ExerciseDetailContent({ ex }) {
           )}
         </div>
       </div>
-
-      {ex.svgPath && (
-        <a
-          href={ex.svgPath}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-ghost w-full justify-center"
-        >
-          Open SVG in new tab
-        </a>
-      )}
     </div>
   );
 }
