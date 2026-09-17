@@ -1,791 +1,332 @@
 #!/usr/bin/env bash
 # ================================================================
-# FEATURE 39: FIX EXERCISES FILTER + SVGs CHO ANATOME
-# Chạy từ ~/Code/tgr: bash feature39.sh
+# FEATURE 40: FIX ABS RULE ORDER + REGENERATE
+# Chạy từ ~/Code/tgr: bash feature40.sh
 # ================================================================
 set -euo pipefail
 
 TGR_DIR="$HOME/Code/tgr"
 cd "$TGR_DIR"
 
-# ============================================================
-# 1. client/src/pages/Exercises.jsx — server-side filter + infinite
-# ============================================================
-cat > client/src/pages/Exercises.jsx <<'EOF'
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, X, Play, Activity, Loader, BookOpen } from 'lucide-react';
-import { useFetch } from '../hooks/useFetch.js';
-import { api } from '../lib/api.js';
-import Skeleton from '../components/Skeleton.jsx';
-import Empty from '../components/Empty.jsx';
-import Modal from '../components/Modal.jsx';
-import LazySvg from '../components/LazySvg.jsx';
-import { useToast } from '../lib/toast.jsx';
-import { fmtNumber } from '../lib/format.js';
+cat > server/scripts/classify-from-filename.js <<'SCRIPT_EOF'
+#!/usr/bin/env node
+/**
+ * Detailed muscle classification v6.
+ * Rule order: SPECIFIC FIRST (abs/obliques → traps/rear-delt → others).
+ */
 
-const PAGE_SIZE = 50;
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const SOURCE_TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'anatome', label: 'Anatome (879)' },
-  { key: 'video', label: 'With Video' },
-  { key: 'custom', label: 'Custom' },
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const MAPS_DIR = path.join(__dirname, '..', 'public', 'muscle-maps');
+const OUT_FILE = path.join(__dirname, '..', 'public', 'anatome-exercises.json');
+
+const LABELS = {
+  neck: 'Neck',
+  traps: 'Traps',
+  'front-delts': 'Front Delt',
+  'side-delts': 'Side Delt',
+  'rear-delts': 'Rear Delt',
+  'upper-chest': 'Upper Chest',
+  chest: 'Chest',
+  lats: 'Lats',
+  'middle-back': 'Middle Back',
+  'lower-back': 'Lower Back',
+  biceps: 'Biceps',
+  triceps: 'Triceps',
+  forearms: 'Forearms',
+  abs: 'Abs',
+  obliques: 'Obliques',
+  glutes: 'Glutes',
+  quadriceps: 'Quads',
+  hamstrings: 'Hamstrings',
+  calves: 'Calves',
+  mobility: 'Mobility',
+  cardio: 'Cardio',
+  other: 'Other',
+};
+function labelFor(slug) { return LABELS[slug] || slug; }
+
+// ============================================================
+// RULES — ORDER: MOST SPECIFIC FIRST
+// ============================================================
+const RULES = [
+  // ========== 1. STRETCH (nhất định trước) ==========
+  { kw: ['stretch', 'mobility', 'foam roll', 'cat cow', 'downward dog',
+         'pigeon', 'hip opener', 'shoulder dislocate', 'sun salutation',
+         'world greatest', 'dynamic warm', 'warm up', 'cossack',
+         '90 90', 'deep squat hold', 'pose', 'yoga', 'reclining',
+         'big toe pose', 'sleeper stretch', 'pigeon pose',
+         'butterfly pose', 'cobra stretch', 'child pose'],
+    slugs: ['mobility'], bp: 'stretch' },
+
+  // ========== 2. FOREARMS ==========
+  { kw: ['wrist curl', 'wrist extension', 'reverse wrist curl',
+         'wrist extensor', 'wrist flexor', 'reverse wrist',
+         'farmer walk', 'farmer carry', 'farmers walk', 'plate pinch',
+         'hand grip', 'wrist'],
+    slugs: ['forearms'], bp: 'forearms' },
+
+  // ========== 3. NECK ==========
+  { kw: ['neck', 'head turn', 'head tilt', 'neck flexion', 'neck extension'],
+    slugs: ['neck'], bp: 'shoulders' },
+
+  // ========== 4. TRAPS ==========
+  { kw: ['shrug', 'trap', 'upright row', 'face pull',
+         'y raise', 'y-raise', 'band pull apart'],
+    slugs: ['traps'], bp: 'back' },
+
+  // ========== 5. REAR DELTS ==========
+  { kw: ['reverse fly', 'reverse-fly', 'rear delt fly', 'rear delt raise',
+         'bent over lateral raise', 'lying one arm deltoid rear'],
+    slugs: ['rear-delts'], bp: 'shoulders' },
+
+  // ========== 6. FRONT DELTS ==========
+  { kw: ['front raise', 'forward raise'],
+    slugs: ['front-delts'], bp: 'shoulders' },
+
+  // ========== 7. SIDE DELTS ==========
+  { kw: ['lateral raise', 'side delt', 'side lateral'],
+    slugs: ['side-delts'], bp: 'shoulders' },
+
+  // ========== 8. SHOULDERS (chung) ==========
+  { kw: ['shoulder press', 'overhead press', 'military press',
+         'arnold press', 'delt raise', 'plate raise', 'landmine press',
+         'pike press', 'shoulder raise', 'bradford press', 'bradford rock',
+         'slinger', 'arm slinger', 'push press', 'dumbbell push press',
+         'shoulder external rotation', 'shoulder internal rotation',
+         'external shoulder rotation', 'internal shoulder rotation',
+         'seated alternate shoulder', 'alternate shoulder',
+         'incline raise', 'incline t raise', 't raise',
+         'shoulder flexor', 'side press', 'alternate side press',
+         'overhead reach', 'shoulder'],
+    slugs: ['front-delts', 'side-delts'], bp: 'shoulders' },
+
+  // ========== 9. UPPER CHEST ==========
+  { kw: ['incline bench', 'incline press', 'incline dumbbell', 'incline fly',
+         'upper chest', 'low to high cable fly', 'low cable fly'],
+    slugs: ['upper-chest'], bp: 'chest' },
+
+  // ========== 10. CHEST ==========
+  { kw: ['bench press', 'chest press', 'pec deck', 'chest fly',
+         'cable fly', 'crossover', 'cross over', 'cross-over',
+         'decline press', 'decline fly', 'dumbbell fly', 'machine fly',
+         'pushup', 'push up', 'push-up', 'svend press', 'butterfly',
+         'floor press', 'pin press', 'reverse grip press', 'wide grip press',
+         'hammer press', 'bench seated press', 'chest squeeze',
+         'isometric chest', 'dumbbell bench seated',
+         'chest pass', 'chest push', 'medicine ball chest',
+         'high to low cable fly', 'middle cable fly', 'chest'],
+    slugs: ['chest'], bp: 'chest' },
+
+  { kw: ['dip'], slugs: ['chest', 'triceps'], bp: 'chest' },
+
+  // ========== 11. LATS ==========
+  { kw: ['pullup', 'pull-up', 'pull up', 'pulldown', 'pull down',
+         'lat pull', 'lat pulldown', 'chin up', 'chinup', 'chin-up',
+         'lat pullover', 'straight arm pulldown', 'lat'],
+    slugs: ['lats'], bp: 'back' },
+
+  // ========== 12. MIDDLE BACK ==========
+  { kw: ['row', 't bar', 'tbar', 'seated row', 'inverted row',
+         'cable row', 'barbell row', 'dumbbell row', 'machine row',
+         'cable twisting pull', 'judo flip', 'middle back'],
+    slugs: ['middle-back'], bp: 'back' },
+
+  // ========== 13. LOWER BACK ==========
+  { kw: ['deadlift', 'dead lift', 'back extension', 'hyperextension',
+         'reverse hyper', 'good morning', 'rack pull',
+         'clean and press', 'power clean', 'hang clean', 'lower back',
+         'erector'],
+    slugs: ['lower-back'], bp: 'back' },
+
+  // ========== 14. CLEAN/SNATCH/JERK ==========
+  { kw: ['snatch', 'jerk', 'clean'],
+    slugs: ['quadriceps', 'hamstrings', 'lower-back'], bp: 'legs' },
+
+  // ========== 15. BACK chung ==========
+  { kw: ['pullover', 'bent arm pullover'],
+    slugs: ['lats', 'middle-back'], bp: 'back' },
+
+  // ========== 16. BICEPS ==========
+  { kw: ['curl', 'bicep', 'biceps', 'zottman', '21s'],
+    slugs: ['biceps'], bp: 'biceps' },
+
+  // ========== 17. TRICEPS ==========
+  { kw: ['tricep', 'triceps', 'skull crusher', 'skullcrusher', 'skull',
+         'pushdown', 'kickback', 'overhead extension', 'bench dip',
+         'diamond pushup', 'jm press', 'tate press', 'lying extension',
+         'french press', 'concentration extension', 'cable extension',
+         'seated extension', 'standing one arm extension',
+         'incline two arm extension', 'close grip press', 'close grip bench',
+         'close grip to skull', 'tricep extension'],
+    slugs: ['triceps'], bp: 'triceps' },
+
+  // ========== 18. OBLIQUES ==========
+  { kw: ['oblique', 'side bend', 'wood chop', 'side plank', 'side crunch',
+         'russian twist'],
+    slugs: ['obliques'], bp: 'core' },
+
+  // ========== 19. ABS (trước legs để bắt "leg raise" abs) ==========
+  { kw: ['crunch', 'sit up', 'situp', 'sit-up', 'plank', 'leg raise',
+         'knee raise', 'hanging leg', 'hanging knee', 'hanging',
+         'ab wheel', 'ab roller', 'jackknife',
+         'v up', 'bicycle', 'toe touch', 'dead bug', 'bird dog',
+         'hollow hold', 'hollow body', 'mountain climber',
+         'flutter kick', 'scissor', 'copenhagen',
+         'rollout', 'roll out', 'rollerout', 'l sit', 'front lever',
+         'back lever', 'dragon flag', 'pallof', 'carry', 'overhead carry',
+         'suitcase carry', 'farmers carry', 'hug knee', 'hug keens',
+         'leg pull in', 'pull in', 'shoulder tap', 'abs', 'core'],
+    slugs: ['abs'], bp: 'core' },
+
+  // ========== 20. GLUTES ==========
+  { kw: ['hip thrust', 'glute', 'hip abduction', 'hip adduction',
+         'hip extension', 'donkey kick', 'fire hydrant', 'clamshell',
+         'pull through', 'glute bridge'],
+    slugs: ['glutes'], bp: 'legs' },
+
+  // ========== 21. HAMSTRINGS ==========
+  { kw: ['romanian deadlift', 'romanian', 'rdl', 'stiff leg', 'stiff legged',
+         'leg curl', 'lying leg curl', 'seated leg curl', 'hamstring',
+         'nordic curl'],
+    slugs: ['hamstrings'], bp: 'legs' },
+
+  // ========== 22. CALVES (trước quads để bắt "calf") ==========
+  { kw: ['calf raise', 'calf press', 'calf', 'calves', 'donkey calf',
+         'seated calf', 'standing calf'],
+    slugs: ['calves'], bp: 'legs' },
+
+  // ========== 23. QUADS ==========
+  { kw: ['squat', 'leg extension', 'leg press', 'lunge', 'step up',
+         'step-up', 'pistol', 'bulgarian', 'goblet', 'hack squat',
+         'sissy squat', 'front squat', 'back squat', 'jump squat',
+         'split squat', 'duck walk', 'curtsy lunge', 'walking lunge',
+         'reverse lunge', 'zercher', 'box squat', 'quad', 'leg kickback'],
+    slugs: ['quadriceps'], bp: 'legs' },
+
+  // ========== 24. LEGS chung ==========
+  { kw: ['thruster', 'hip hinge', 'lower body', 'single leg', 'leg'],
+    slugs: ['quadriceps', 'hamstrings'], bp: 'legs' },
+
+  // ========== 25. CARDIO ==========
+  { kw: ['treadmill', 'bike', 'cycling', 'rowing machine', 'rope wave',
+         'battle rope', 'battling rope', 'jump rope', 'burpee', 'sprint',
+         'stepmill', 'elliptical', 'air bike', 'high knees', 'jumping jack',
+         'box jump', 'jump', 'skip', 'hop', 'run', 'jog', 'walk', 'stair',
+         'skierg', 'assault bike', 'spin bike', 'astride', 'march',
+         'back and forth step', 'sledge', 'sledgehammer', 'rope climb',
+         'medicine ball slam', 'overhead slam'],
+    slugs: ['cardio'], bp: 'cardio' },
 ];
 
-const MUSCLE_FILTERS = [
-  '', 'traps', 'lats', 'middle-back', 'lower-back',
-  'front-delts', 'side-delts', 'rear-delts',
-  'upper-chest', 'chest',
-  'biceps', 'triceps', 'forearms',
-  'abs', 'obliques',
-  'glutes', 'quadriceps', 'hamstrings', 'calves',
-];
-
-function slugify(id) {
-  return String(id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-export default function Exercises() {
-  const toast = useToast();
-  const navigate = useNavigate();
-
-  const [tab, setTab] = useState('all');
-  const [q, setQ] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [muscleSlug, setMuscleSlug] = useState('');
-
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState(null);
-
-  const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', muscleGroup: 'chest', equipment: '' });
-
-  const offsetRef = useRef(0);
-  const sentinelRef = useRef(null);
-  const requestIdRef = useRef(0);
-
-  const facets = useFetch(() => api.get('/exercises/facets'), []);
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 300);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  // Load page — SERVER-SIDE filter
-  const loadPage = useCallback(async (reset) => {
-    const reqId = ++requestIdRef.current;
-    setLoading(true);
-    setError(null);
-
-    const offset = reset ? 0 : offsetRef.current;
-    const p = new URLSearchParams();
-    if (debouncedQ) p.set('q', debouncedQ);
-    if (muscleSlug) p.set('muscleSlug', muscleSlug);
-
-    // Source mapping
-    if (tab === 'anatome') p.set('source', 'anatome');
-    else if (tab === 'video') p.set('source', 'video');
-    else if (tab === 'custom') p.set('source', 'custom');
-    // 'all' = no source param
-
-    p.set('limit', String(PAGE_SIZE));
-    p.set('offset', String(offset));
-
-    try {
-      const res = await api.get(`/exercises?${p}`);
-      if (reqId !== requestIdRef.current) return;
-
-      const list = res.exercises || [];
-      const tot = res.total || 0;
-
-      if (reset) {
-        setItems(list);
-        offsetRef.current = list.length;
-      } else {
-        setItems((prev) => [...prev, ...list]);
-        offsetRef.current = offset + list.length;
+function classifyByFilename(id) {
+  const lower = id.toLowerCase().replace(/[_-]+/g, ' ');
+  for (const rule of RULES) {
+    for (const kw of rule.kw) {
+      const kwLower = kw.replace(/_/g, ' ');
+      if (lower.includes(kwLower)) {
+        return { slugs: rule.slugs, bodyPart: rule.bp };
       }
-      setTotal(tot);
-      setHasMore((offset + list.length) < tot);
-    } catch (e) {
-      if (reqId !== requestIdRef.current) return;
-      setError(e.message);
-    } finally {
-      if (reqId === requestIdRef.current) setLoading(false);
-    }
-  }, [debouncedQ, muscleSlug, tab]);
-
-  // Reset + load khi filter đổi
-  useEffect(() => {
-    setItems([]);
-    setTotal(0);
-    setHasMore(true);
-    offsetRef.current = 0;
-    setError(null);
-    loadPage(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQ, muscleSlug, tab]);
-
-  // Infinite scroll
-  useEffect(() => {
-    if (!hasMore || loading) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) loadPage(false); },
-      { rootMargin: '400px' }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [hasMore, loading, loadPage]);
-
-  const submitCreate = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/exercises', form);
-      toast('Exercise created');
-      setCreateOpen(false);
-      setForm({ name: '', muscleGroup: 'chest', equipment: '' });
-      setTab('custom');
-    } catch (e) {
-      toast(e.message, 'error');
-    }
-  };
-
-  const onCardClick = (ex) => {
-    if (ex.source === 'anatome') {
-      navigate(`/exercises/anatome:${ex.svgId || ex.id}`);
-    } else {
-      navigate(`/exercises/${ex.id}`);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <BookOpen className="w-6 h-6 text-accent" />
-          <div>
-            <h1 className="text-2xl font-semibold">Exercise Library</h1>
-            <p className="text-sm text-ink-400 mt-0.5">
-              Hợp nhất: DB + Anatome 879 bài
-            </p>
-          </div>
-        </div>
-        <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4" /> Custom
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-ink-700 overflow-x-auto">
-        {SOURCE_TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm whitespace-nowrap ${
-              tab === t.key
-                ? 'text-accent border-b-2 border-accent'
-                : 'text-ink-400 hover:text-white'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="card p-4 space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
-          <input
-            className="input pl-9"
-            placeholder="Tìm bài tập (bench, squat, curl...)"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-
-        {/* Muscle filter */}
-        <div className="space-y-2 pt-2 border-t border-ink-700">
-          <div className="text-[10px] uppercase tracking-wide text-ink-500">
-            Muscle
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              className={`chip text-[10px] ${muscleSlug === '' ? 'border-accent text-accent' : ''}`}
-              onClick={() => setMuscleSlug('')}
-            >
-              All
-            </button>
-            {MUSCLE_FILTERS.filter(Boolean).map((slug) => (
-              <button
-                key={slug}
-                className={`chip text-[10px] capitalize ${muscleSlug === slug ? 'border-accent text-accent' : ''}`}
-                onClick={() => setMuscleSlug(muscleSlug === slug ? '' : slug)}
-              >
-                {slug.replace(/-/g, ' ')}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {(muscleSlug || debouncedQ) && (
-          <div className="flex items-center justify-between text-xs pt-2 border-t border-ink-700">
-            <div className="text-ink-400">
-              {muscleSlug && <span className="text-accent capitalize">{muscleSlug}</span>}
-              {debouncedQ && <span className="ml-2">· "{debouncedQ}"</span>}
-              <span className="ml-2">→ {total} kết quả</span>
-            </div>
-            <button
-              className="text-ink-400 hover:text-white flex items-center gap-1"
-              onClick={() => { setMuscleSlug(''); setQ(''); }}
-            >
-              <X className="w-3 h-3" /> Clear
-            </button>
-          </div>
-        )}
-      </div>
-
-      {error && (
-        <div className="card p-4 text-red-400 text-sm">
-          {error}{' '}
-          <button className="underline ml-2" onClick={() => loadPage(true)}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {items.length === 0 && loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <Skeleton key={i} className="h-60" />
-          ))}
-        </div>
-      ) : items.length ? (
-        <>
-          <div className="text-xs text-ink-400">
-            Hiện {items.length} / {total} bài tập
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {items.map((ex) => (
-              <button
-                key={ex.id}
-                onClick={() => onCardClick(ex)}
-                className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
-              >
-                <div className="relative bg-ink-950 rounded-lg h-40 overflow-hidden">
-                  {ex.hasSvg ? (
-                    <LazySvg exerciseId={ex.svgId || ex.id} className="w-full h-full p-2" />
-                  ) : ex.videoUrl ? (
-                    <video
-                      src={ex.videoUrl}
-                      muted loop playsInline preload="metadata"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-500">
-                      No media
-                    </div>
-                  )}
-                </div>
-
-                <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
-                  {ex.name}
-                </div>
-
-                <div className="flex flex-wrap gap-1">
-                  {ex.source && (
-                    <span className="chip text-[10px] capitalize">{ex.source}</span>
-                  )}
-                  {ex.bodyPart && (
-                    <span className="chip text-[10px] capitalize">{ex.bodyPart}</span>
-                  )}
-                  {ex.muscleSlugs?.map((slug) => (
-                    <span key={slug} className="chip text-[10px] capitalize border-accent/40">
-                      {slug.replace(/-/g, ' ')}
-                    </span>
-                  ))}
-                  {ex.isCustom && (
-                    <span className="chip text-[10px] border-accent text-accent">custom</span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {hasMore && (
-            <div ref={sentinelRef} className="flex justify-center py-6">
-              {loading ? (
-                <div className="flex items-center gap-2 text-ink-400 text-sm">
-                  <Loader className="w-4 h-4 animate-spin" /> Đang tải...
-                </div>
-              ) : (
-                <button className="btn btn-ghost" onClick={() => loadPage(false)}>
-                  Load more
-                </button>
-              )}
-            </div>
-          )}
-
-          {!hasMore && items.length >= total && total > PAGE_SIZE && (
-            <div className="text-center text-xs text-ink-500 py-4">
-              Đã hiển thị toàn bộ {total} bài tập
-            </div>
-          )}
-        </>
-      ) : !loading ? (
-        <Empty
-          title="Không có bài tập"
-          hint={muscleSlug || debouncedQ ? 'Không có kết quả.' : 'Chưa có dữ liệu.'}
-          icon={Search}
-        />
-      ) : null}
-
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Custom Exercise">
-        <form onSubmit={submitCreate} className="space-y-3">
-          <div>
-            <label className="label">Name</label>
-            <input className="input" value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          </div>
-          <div>
-            <label className="label">Muscle Group</label>
-            <select className="input" value={form.muscleGroup}
-              onChange={(e) => setForm({ ...form, muscleGroup: e.target.value })}>
-              <option value="chest">chest</option>
-              <option value="back">back</option>
-              <option value="shoulders">shoulders</option>
-              <option value="biceps">biceps</option>
-              <option value="triceps">triceps</option>
-              <option value="legs">legs</option>
-              <option value="core">core</option>
-              <option value="cardio">cardio</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Equipment</label>
-            <input className="input" value={form.equipment}
-              onChange={(e) => setForm({ ...form, equipment: e.target.value })} />
-          </div>
-          <button className="btn btn-primary w-full justify-center">Create</button>
-        </form>
-      </Modal>
-    </div>
-  );
-}
-EOF
-echo "✅ client/src/pages/Exercises.jsx"
-
-# ============================================================
-# 2. server/src/services/unified-exercise.service.js
-#    Fix filter muscleSlug cho Anatome
-# ============================================================
-cat > server/src/services/unified-exercise.service.js <<'EOF'
-import { prisma } from '../utils/prisma.js';
-import { loadAnatomeExercises } from './anatome.service.js';
-
-export async function searchUnifiedExercises(userId, opts = {}) {
-  const {
-    q,
-    muscleGroup,
-    muscleSlug,
-    source,
-    limit = 50,
-    offset = 0,
-  } = opts;
-
-  // === 1. Fetch DB ===
-  const dbWhere = {
-    OR: [{ userId: null }, { userId }],
-  };
-  if (q) dbWhere.name = { contains: q };
-  if (muscleGroup) dbWhere.muscleGroup = muscleGroup;
-  if (source === 'custom') {
-    dbWhere.userId = userId;
-    dbWhere.isCustom = true;
-  }
-
-  const dbExercises = await prisma.exercise.findMany({
-    where: dbWhere,
-    select: {
-      id: true,
-      name: true,
-      muscleGroup: true,
-      equipment: true,
-      isCustom: true,
-      videoUrl: true,
-      imageUrl: true,
-    },
-  });
-
-  const dbNames = new Set(dbExercises.map((e) => e.name.toLowerCase()));
-
-  // === 2. Fetch Anatome ===
-  const { exercises: anatomeExercises } = await loadAnatomeExercises();
-
-  let anatomeFiltered = anatomeExercises;
-  if (q) {
-    const ql = q.toLowerCase();
-    anatomeFiltered = anatomeFiltered.filter((e) =>
-      e.name.toLowerCase().includes(ql) ||
-      (e.muscleSlugs || []).some(m => m.toLowerCase().includes(ql))
-    );
-  }
-  if (muscleSlug) {
-    anatomeFiltered = anatomeFiltered.filter((e) =>
-      (e.muscleSlugs || []).includes(muscleSlug)
-    );
-  }
-
-  // === 3. Merge ===
-  const merged = [];
-
-  const includeDb = source !== 'anatome';
-  const includeAnatome = source !== 'db' && source !== 'custom' && source !== 'video';
-
-  if (includeDb) {
-    for (const ex of dbExercises) {
-      if (source === 'video' && !ex.videoUrl) continue;
-      if (muscleSlug && ex.muscleGroup !== muscleSlug) continue;
-
-      merged.push({
-        id: ex.id,
-        name: ex.name,
-        muscleGroup: ex.muscleGroup,
-        bodyPart: ex.muscleGroup,
-        equipment: ex.equipment,
-        isCustom: ex.isCustom,
-        videoUrl: ex.videoUrl,
-        imageUrl: ex.imageUrl,
-        source: ex.isCustom ? 'custom' : 'db',
-        primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
-        muscleSlugs: ex.muscleGroup ? [ex.muscleGroup] : [],
-        hasSvg: false,
-      });
     }
   }
-
-  if (includeAnatome) {
-    for (const ex of anatomeFiltered) {
-      if (dbNames.has(ex.name.toLowerCase())) continue;
-
-      merged.push({
-        id: `anatome:${ex.id}`,
-        svgId: ex.id,
-        name: ex.name,
-        bodyPart: ex.bodyPart,
-        muscleGroup: ex.bodyPart,
-        muscleSlugs: ex.muscleSlugs || [],
-        primaryMuscles: ex.primaryMuscles || [],
-        secondaryMuscles: ex.secondaryMuscles || [],
-        isCustom: false,
-        source: 'anatome',
-        hasSvg: true,
-      });
-    }
-  }
-
-  merged.sort((a, b) => a.name.localeCompare(b.name));
-
-  const total = merged.length;
-  const sliced = merged.slice(offset, offset + limit);
-
-  return { exercises: sliced, total };
+  return { slugs: ['other'], bodyPart: 'other' };
 }
 
-export async function getUnifiedExercise(userId, id) {
-  if (id.startsWith('anatome:')) {
-    const anatomeId = id.slice('anatome:'.length);
-    const { exercises } = await loadAnatomeExercises();
-    const ex = exercises.find((e) => e.id === anatomeId);
-    if (!ex) return null;
-    return {
+async function main() {
+  console.log('🚀 Classify v6 (ordered)');
+
+  const files = await fs.readdir(MAPS_DIR);
+  const svgFiles = files.filter(f => f.endsWith('.svg'));
+
+  const results = [];
+  const byGroup = {};
+  const bySlug = {};
+
+  for (const file of svgFiles) {
+    const id = file.replace('.svg', '');
+    const displayName = id.replace(/_/g, ' ');
+    const cls = classifyByFilename(id);
+
+    byGroup[cls.bodyPart] = (byGroup[cls.bodyPart] || 0) + 1;
+    for (const slug of cls.slugs) {
+      bySlug[slug] = (bySlug[slug] || 0) + 1;
+    }
+
+    results.push({
       id,
-      name: ex.name,
-      muscleGroup: ex.bodyPart,
-      bodyPart: ex.bodyPart,
-      muscleSlugs: ex.muscleSlugs || [],
-      primaryMuscles: ex.primaryMuscles || [],
-      secondaryMuscles: ex.secondaryMuscles || [],
-      isCustom: false,
-      source: 'anatome',
-      hasSvg: true,
-      svgId: ex.id,
-      instructions: ex.instructions || [],
-      videoUrl: null,
-    };
+      name: displayName,
+      bodyPart: cls.bodyPart,
+      muscleSlugs: cls.slugs,
+      primaryMuscles: cls.slugs.map(labelFor),
+      secondaryMuscles: [],
+      secondarySlugs: [],
+      svgPath: `/static/muscle-maps/${file}`,
+      matched: true,
+    });
   }
 
-  const ex = await prisma.exercise.findFirst({
-    where: { id, OR: [{ userId: null }, { userId }] },
-  });
-  if (!ex) return null;
+  results.sort((a, b) => a.name.localeCompare(b.name));
 
-  return {
-    id: ex.id,
-    name: ex.name,
-    muscleGroup: ex.muscleGroup,
-    equipment: ex.equipment,
-    isCustom: ex.isCustom,
-    source: ex.isCustom ? 'custom' : 'db',
-    videoUrl: ex.videoUrl,
-    imageUrl: ex.imageUrl,
-    primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
-    muscleSlugs: ex.muscleGroup ? [ex.muscleGroup] : [],
-    hasSvg: false,
-    instructions: ex.instructions || [],
-    overview: ex.overview,
+  console.log('');
+  console.log('📈 BodyPart:');
+  for (const [bp, count] of Object.entries(byGroup).sort((a, b) => b[1] - a[1])) {
+    console.log(`   ${bp.padEnd(20)} ${count}`);
+  }
+
+  console.log('');
+  console.log('💪 Muscle slug:');
+  for (const [slug, count] of Object.entries(bySlug).sort((a, b) => b[1] - a[1])) {
+    console.log(`   ${slug.padEnd(20)} ${count}`);
+  }
+
+  const output = {
+    _meta: {
+      source: 'detailed-classification-v6',
+      generatedAt: new Date().toISOString(),
+      totalExercises: results.length,
+      byGroup,
+      bySlug,
+    },
+    exercises: results,
   };
-}
-EOF
-echo "✅ server/src/services/unified-exercise.service.js"
 
-# ============================================================
-# 3. server/src/controllers/exercise.controller.js
-#    Fix getExercise cho anatome id
-# ============================================================
-cat > server/src/controllers/exercise.controller.js <<'EOF'
-import { prisma } from '../utils/prisma.js';
-import { httpError } from '../middleware/error.middleware.js';
-import { volume, epley1RM } from '../utils/calc.js';
-import { getMuscleContributions, labelFor } from '../services/muscle.service.js';
-import {
-  searchUnifiedExercises,
-  getUnifiedExercise,
-} from '../services/unified-exercise.service.js';
+  await fs.writeFile(OUT_FILE, JSON.stringify(output, null, 2), 'utf8');
+  console.log('');
+  console.log(`✅ Wrote ${OUT_FILE}`);
 
-function computeBestForExercise(sessions) {
-  const best = { max_weight: null, max_reps: null, estimated_1rm: null, max_volume: null };
-  for (const sess of sessions) {
-    for (const s of sess.sets) {
-      const at = sess.date;
-      if (!best.max_weight || s.weight > best.max_weight.value)
-        best.max_weight = { type: 'max_weight', value: s.weight, reps: s.reps, weight: s.weight, achievedAt: at };
-      if (!best.max_reps || s.reps > best.max_reps.value)
-        best.max_reps = { type: 'max_reps', value: s.reps, reps: s.reps, weight: s.weight, achievedAt: at };
-      const v = s.weight * s.reps;
-      if (!best.max_volume || v > best.max_volume.value)
-        best.max_volume = { type: 'max_volume', value: v, reps: s.reps, weight: s.weight, achievedAt: at };
-      const est = s.estimated1RM ?? epley1RM(s.weight, s.reps);
-      if (est != null && s.reps > 0 && s.reps <= 20) {
-        if (!best.estimated_1rm || est > best.estimated_1rm.value)
-          best.estimated_1rm = { type: 'estimated_1rm', value: est, reps: s.reps, weight: s.weight, achievedAt: at };
-      }
-    }
-  }
-  return Object.values(best).filter(Boolean).sort((a, b) => new Date(b.achievedAt) - new Date(a.achievedAt));
-}
-
-export async function listExercises(req, res) {
-  const userId = req.user.id;
-  const { q, muscleGroup, muscleSlug, source, limit, offset } = req.query;
-
-  const result = await searchUnifiedExercises(userId, {
-    q: q || null,
-    muscleGroup: muscleGroup || null,
-    muscleSlug: muscleSlug || null,
-    source: source || null,
-    limit: limit ? Math.min(200, Number(limit)) : 50,
-    offset: offset ? Number(offset) : 0,
-  });
-
-  res.json(result);
-}
-
-export async function facets(req, res) {
-  const userId = req.user.id;
-
-  const dbExercises = await prisma.exercise.findMany({
-    where: { OR: [{ userId: null }, { userId }] },
-    select: { muscleGroup: true, equipment: true },
-  });
-
-  const muscleGroups = new Set();
-  const equipments = new Set();
-  for (const e of dbExercises) {
-    if (e.muscleGroup) muscleGroups.add(e.muscleGroup);
-    if (e.equipment) equipments.add(e.equipment);
-  }
-
-  const { loadAnatomeExercises } = await import('../services/anatome.service.js');
-  const { exercises } = await loadAnatomeExercises();
-  const muscleSlugs = new Set();
-  const bodyParts = new Set();
-  for (const ex of exercises) {
-    for (const m of ex.muscleSlugs || []) muscleSlugs.add(m);
-    if (ex.bodyPart) bodyParts.add(ex.bodyPart);
-  }
-
-  res.json({
-    muscleGroups: [...muscleGroups].sort(),
-    equipments: [...equipments].sort(),
-    muscleSlugs: [...muscleSlugs].sort(),
-    bodyParts: [...bodyParts].sort(),
-  });
-}
-
-export async function createExercise(req, res) {
-  const { name, muscleGroup, equipment } = req.body;
-  if (!name || !muscleGroup) throw httpError(400, 'name and muscleGroup required');
-  try {
-    const exercise = await prisma.exercise.create({
-      data: { name, muscleGroup, equipment, isCustom: true, userId: req.user.id },
-    });
-    res.status(201).json({ exercise });
-  } catch {
-    throw httpError(409, 'Exercise already exists');
+  // Verify Assisted Hanging Knee Raise
+  const check = results.find(r => r.id === 'Assisted_Hanging_Knee_Raise_With_Throw_Down');
+  if (check) {
+    console.log('');
+    console.log('📋 Check "Assisted Hanging Knee Raise":');
+    console.log(`   bodyPart: ${check.bodyPart}`);
+    console.log(`   muscleSlugs: ${check.muscleSlugs.join(', ')}`);
   }
 }
 
-export async function getExercise(req, res) {
-  const userId = req.user.id;
-  const { id } = req.params;
+main().catch(e => { console.error('❌', e); process.exit(1); });
+SCRIPT_EOF
 
-  // Anatome exercise
-  if (id.startsWith('anatome:')) {
-    const ex = await getUnifiedExercise(userId, id);
-    if (!ex) throw httpError(404, 'Exercise not found');
-    return res.json({ exercise: ex, stats: null, prs: [], sessions: [], muscleContributions: [] });
-  }
+echo "✅ Updated classify script"
 
-  // DB exercise
-  const exercise = await prisma.exercise.findFirst({
-    where: { id, OR: [{ userId: null }, { userId }] },
-  });
-  if (!exercise) throw httpError(404, 'Exercise not found');
-
-  const sets = await prisma.workoutSet.findMany({
-    where: {
-      isWarmup: false,
-      workoutExercise: { exerciseId: id, workout: { userId } },
-    },
-    include: { workoutExercise: { include: { workout: true } } },
-    orderBy: { workoutExercise: { workout: { date: 'asc' } } },
-  });
-
-  const sessions = new Map();
-  for (const s of sets) {
-    const w = s.workoutExercise.workout;
-    if (!sessions.has(w.id)) {
-      sessions.set(w.id, { workoutId: w.id, date: w.date, name: w.name, sets: [] });
-    }
-    sessions.get(w.id).sets.push({
-      id: s.id, setNumber: s.setNumber,
-      weight: s.weight, reps: s.reps,
-      rir: s.rir, rpe: s.rpe, estimated1RM: s.estimated1RM,
-    });
-  }
-  const sessionList = [...sessions.values()].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  let totalSets = 0, totalReps = 0, totalVolume = 0;
-  let maxWeight = 0, best1RM = 0, best5 = 0, best10 = 0;
-  let startingWeight = null, currentBest = 0;
-  let rirSum = 0, rirCount = 0, rpeSum = 0, rpeCount = 0;
-  const rirDistribution = {};
-  const rpeProgression = [];
-
-  for (const sess of sessionList) {
-    let sRirSum = 0, sRirCount = 0, sRpeSum = 0, sRpeCount = 0;
-    for (const s of sess.sets) {
-      totalSets++; totalReps += s.reps;
-      totalVolume += volume(s.weight, s.reps);
-      if (startingWeight == null) startingWeight = s.weight;
-      if (s.weight > maxWeight) maxWeight = s.weight;
-      if (s.estimated1RM && s.estimated1RM > best1RM) best1RM = s.estimated1RM;
-      if (s.reps >= 5 && s.weight > best5) best5 = s.weight;
-      if (s.reps >= 10 && s.weight > best10) best10 = s.weight;
-      if (s.rir != null) {
-        rirSum += s.rir; rirCount++; sRirSum += s.rir; sRirCount++;
-        const key = String(s.rir);
-        rirDistribution[key] = (rirDistribution[key] || 0) + 1;
-      }
-      if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; sRpeSum += s.rpe; sRpeCount++; }
-    }
-    if (sess.sets.length) currentBest = Math.max(currentBest, ...sess.sets.map((s) => s.weight));
-    if (sRirCount > 0 || sRpeCount > 0) {
-      rpeProgression.push({
-        date: new Date(sess.date).toISOString().slice(0, 10),
-        avgRir: sRirCount ? +(sRirSum / sRirCount).toFixed(2) : null,
-        avgRpe: sRpeCount ? +(sRpeSum / sRpeCount).toFixed(2) : null,
-      });
-    }
-  }
-
-  const prs = computeBestForExercise(sessionList);
-  const contribRaw = await getMuscleContributions(exercise);
-  const muscleContributions = Object.entries(contribRaw)
-    .map(([mg, weight]) => ({ muscleGroup: mg, label: labelFor(mg), weight }))
-    .sort((a, b) => b.weight - a.weight);
-
-  res.json({
-    exercise: {
-      id: exercise.id,
-      name: exercise.name,
-      muscleGroup: exercise.muscleGroup,
-      equipment: exercise.equipment,
-      isCustom: exercise.isCustom,
-      videoUrl: exercise.videoUrl,
-      imageUrl: exercise.imageUrl,
-      overview: exercise.overview,
-      instructions: exercise.instructions,
-      source: 'db',
-    },
-    muscleContributions,
-    stats: {
-      totalSets, totalReps, totalSessions: sessionList.length,
-      totalVolume, maxWeight, best1RM, best5, best10,
-      startingWeight: startingWeight ?? 0, currentBest,
-      avgRir: rirCount ? +(rirSum / rirCount).toFixed(2) : null,
-      avgRpe: rpeCount ? +(rpeSum / rpeCount).toFixed(2) : null,
-      rirDistribution, rpeProgression,
-    },
-    prs,
-    sessions: sessionList,
-  });
-}
-
-export async function deleteExercise(req, res) {
-  const { id } = req.params;
-  const exercise = await prisma.exercise.findFirst({
-    where: { id, userId: req.user.id, isCustom: true },
-  });
-  if (!exercise) throw httpError(404, 'Custom exercise not found');
-  await prisma.exercise.delete({ where: { id } });
-  res.json({ ok: true });
-}
-EOF
-echo "✅ server/src/controllers/exercise.controller.js"
-
-# ============================================================
-# 4. Build test
-# ============================================================
-echo ""
-echo "🔨 Build test..."
-cd client
-if npm run build 2>&1 | tail -5; then
-  echo "✅ Build OK"
-else
-  echo "❌ Build FAILED"
-  exit 1
-fi
-cd ..
+cd ~/Code/tgr
+node server/scripts/classify-from-filename.js
 
 echo ""
-echo "================================================================"
-echo "✅ FEATURE 39 hoàn tất"
-echo "================================================================"
+echo "=== Verify specific exercises ==="
+jq '.exercises[] | select(.id == "Assisted_Hanging_Knee_Raise_With_Throw_Down") | {name, bodyPart, muscleSlugs}' server/public/anatome-exercises.json
 echo ""
-echo "Commit + push:"
- git add client/src/pages/Exercises.jsx \\
-        client/src/pages/ExerciseDetail.jsx \\
-        server/src/services/unified-exercise.service.js \\
-        server/src/controllers/exercise.controller.js
- git commit -m 'Feature 39: Server-side filter + Anatome SVG display'
-  git push
+jq '.exercises[] | select(.id == "Barbell_Shrug") | {name, bodyPart, muscleSlugs}' server/public/anatome-exercises.json
 echo ""
+jq '.exercises[] | select(.name | test("Calf Raise"; "i")) | {name, bodyPart, muscleSlugs}' server/public/anatome-exercises.json | head -10
+
+echo ""
+echo "Commit:"
+echo "  git add server/scripts/classify-from-filename.js \\"
+echo "          server/public/anatome-exercises.json"
+echo "  git commit -m 'Feature 40: Fix abs rule order'"
+echo "  git push"
