@@ -357,9 +357,16 @@ function AnatomeExerciseDetail({ exercise }) {
 
   useEffect(() => {
     let cancelled = false;
-    const slug = String(exercise.id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
-    fetch(`/static/muscle-maps/${slug}.svg`)
-      .then((r) => r.text())
+    // svgId là tên file gốc (không có prefix anatome:)
+    const rawId = exercise.svgId || String(exercise.id).replace(/^anatome:/, '');
+    const slug = rawId.replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const url = `/static/muscle-maps/${slug}.svg`;
+
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
       .then((text) => {
         if (cancelled) return;
         const cleaned = text
@@ -369,9 +376,13 @@ function AnatomeExerciseDetail({ exercise }) {
         setSvg(cleaned);
         setSvgLoading(false);
       })
-      .catch(() => setSvgLoading(false));
+      .catch((e) => {
+        if (cancelled) return;
+        console.error('SVG load failed:', url, e.message);
+        setSvgLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [exercise.id]);
+  }, [exercise.id, exercise.svgId]);
 
   return (
     <div className="space-y-4">
