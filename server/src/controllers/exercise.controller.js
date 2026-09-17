@@ -1,58 +1,34 @@
 import { prisma } from '../utils/prisma.js';
 import { httpError } from '../middleware/error.middleware.js';
 import { volume, epley1RM } from '../utils/calc.js';
+import {
+  getMuscleContributions,
+  labelFor,
+} from '../services/muscle.service.js';
 
 function computeBestForExercise(sessions) {
   const best = {
-    max_weight: null,
-    max_reps: null,
-    estimated_1rm: null,
-    max_volume: null,
+    max_weight: null, max_reps: null,
+    estimated_1rm: null, max_volume: null,
   };
   for (const sess of sessions) {
     for (const s of sess.sets) {
       const at = sess.date;
       if (!best.max_weight || s.weight > best.max_weight.value)
-        best.max_weight = {
-          type: 'max_weight',
-          value: s.weight,
-          reps: s.reps,
-          weight: s.weight,
-          achievedAt: at,
-        };
+        best.max_weight = { type: 'max_weight', value: s.weight, reps: s.reps, weight: s.weight, achievedAt: at };
       if (!best.max_reps || s.reps > best.max_reps.value)
-        best.max_reps = {
-          type: 'max_reps',
-          value: s.reps,
-          reps: s.reps,
-          weight: s.weight,
-          achievedAt: at,
-        };
+        best.max_reps = { type: 'max_reps', value: s.reps, reps: s.reps, weight: s.weight, achievedAt: at };
       const v = s.weight * s.reps;
       if (!best.max_volume || v > best.max_volume.value)
-        best.max_volume = {
-          type: 'max_volume',
-          value: v,
-          reps: s.reps,
-          weight: s.weight,
-          achievedAt: at,
-        };
+        best.max_volume = { type: 'max_volume', value: v, reps: s.reps, weight: s.weight, achievedAt: at };
       const est = s.estimated1RM ?? epley1RM(s.weight, s.reps);
       if (est != null && s.reps > 0 && s.reps <= 20) {
         if (!best.estimated_1rm || est > best.estimated_1rm.value)
-          best.estimated_1rm = {
-            type: 'estimated_1rm',
-            value: est,
-            reps: s.reps,
-            weight: s.weight,
-            achievedAt: at,
-          };
+          best.estimated_1rm = { type: 'estimated_1rm', value: est, reps: s.reps, weight: s.weight, achievedAt: at };
       }
     }
   }
-  return Object.values(best)
-    .filter(Boolean)
-    .sort((a, b) => new Date(b.achievedAt) - new Date(a.achievedAt));
+  return Object.values(best).filter(Boolean).sort((a, b) => new Date(b.achievedAt) - new Date(a.achievedAt));
 }
 
 export async function listExercises(req, res) {
@@ -72,16 +48,10 @@ export async function listExercises(req, res) {
     prisma.exercise.findMany({
       where,
       orderBy: [{ muscleGroup: 'asc' }, { name: 'asc' }],
-      take,
-      skip,
+      take, skip,
       select: {
-        id: true,
-        name: true,
-        muscleGroup: true,
-        equipment: true,
-        isCustom: true,
-        videoUrl: true,
-        imageUrl: true,
+        id: true, name: true, muscleGroup: true, equipment: true,
+        isCustom: true, videoUrl: true, imageUrl: true,
       },
     }),
     prisma.exercise.count({ where }),
@@ -95,13 +65,7 @@ export async function createExercise(req, res) {
   if (!name || !muscleGroup) throw httpError(400, 'name and muscleGroup required');
   try {
     const exercise = await prisma.exercise.create({
-      data: {
-        name,
-        muscleGroup,
-        equipment,
-        isCustom: true,
-        userId: req.user.id,
-      },
+      data: { name, muscleGroup, equipment, isCustom: true, userId: req.user.id },
     });
     res.status(201).json({ exercise });
   } catch {
@@ -120,10 +84,8 @@ export async function getExercise(req, res) {
 
   const sets = await prisma.workoutSet.findMany({
     where: {
-      workoutExercise: {
-        exerciseId: id,
-        workout: { userId },
-      },
+      isWarmup: false,
+      workoutExercise: { exerciseId: id, workout: { userId } },
     },
     include: { workoutExercise: { include: { workout: true } } },
     orderBy: { workoutExercise: { workout: { date: 'asc' } } },
@@ -136,43 +98,22 @@ export async function getExercise(req, res) {
       sessions.set(w.id, { workoutId: w.id, date: w.date, name: w.name, sets: [] });
     }
     sessions.get(w.id).sets.push({
-      id: s.id,
-      setNumber: s.setNumber,
-      weight: s.weight,
-      reps: s.reps,
-      rir: s.rir,
-      rpe: s.rpe,
-      estimated1RM: s.estimated1RM,
+      id: s.id, setNumber: s.setNumber,
+      weight: s.weight, reps: s.reps,
+      rir: s.rir, rpe: s.rpe, estimated1RM: s.estimated1RM,
     });
   }
-  const sessionList = [...sessions.values()].sort(
-    (a, b) => new Date(a.date) - new Date(b.date)
-  );
+  const sessionList = [...sessions.values()].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  let totalSets = 0;
-  let totalReps = 0;
-  let totalVolume = 0;
-  let maxWeight = 0;
-  let best1RM = 0;
-  let best5 = 0;
-  let best10 = 0;
-  let startingWeight = null;
-  let currentBest = 0;
-
-  // RIR/RPE tracking
-  let rirSum = 0;
-  let rirCount = 0;
-  let rpeSum = 0;
-  let rpeCount = 0;
-  const rirDistribution = {}; // { '0': 3, '1': 5, '2': 8, ... }
-  const rpeProgression = []; // [{ date, avgRpe, avgRir }, ...]
+  let totalSets = 0, totalReps = 0, totalVolume = 0;
+  let maxWeight = 0, best1RM = 0, best5 = 0, best10 = 0;
+  let startingWeight = null, currentBest = 0;
+  let rirSum = 0, rirCount = 0, rpeSum = 0, rpeCount = 0;
+  const rirDistribution = {};
+  const rpeProgression = [];
 
   for (const sess of sessionList) {
-    let sessionRirSum = 0;
-    let sessionRirCount = 0;
-    let sessionRpeSum = 0;
-    let sessionRpeCount = 0;
-
+    let sRirSum = 0, sRirCount = 0, sRpeSum = 0, sRpeCount = 0;
     for (const s of sess.sets) {
       totalSets++;
       totalReps += s.reps;
@@ -182,35 +123,28 @@ export async function getExercise(req, res) {
       if (s.estimated1RM && s.estimated1RM > best1RM) best1RM = s.estimated1RM;
       if (s.reps >= 5 && s.weight > best5) best5 = s.weight;
       if (s.reps >= 10 && s.weight > best10) best10 = s.weight;
-
       if (s.rir != null) {
-        rirSum += s.rir;
-        rirCount++;
-        sessionRirSum += s.rir;
-        sessionRirCount++;
+        rirSum += s.rir; rirCount++; sRirSum += s.rir; sRirCount++;
         const key = String(s.rir);
         rirDistribution[key] = (rirDistribution[key] || 0) + 1;
       }
-      if (s.rpe != null) {
-        rpeSum += s.rpe;
-        rpeCount++;
-        sessionRpeSum += s.rpe;
-        sessionRpeCount++;
-      }
+      if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; sRpeSum += s.rpe; sRpeCount++; }
     }
-    if (sess.sets.length) {
-      currentBest = Math.max(currentBest, ...sess.sets.map((s) => s.weight));
-    }
-    if (sessionRirCount > 0 || sessionRpeCount > 0) {
+    if (sess.sets.length) currentBest = Math.max(currentBest, ...sess.sets.map((s) => s.weight));
+    if (sRirCount > 0 || sRpeCount > 0) {
       rpeProgression.push({
         date: new Date(sess.date).toISOString().slice(0, 10),
-        avgRir: sessionRirCount ? +(sessionRirSum / sessionRirCount).toFixed(2) : null,
-        avgRpe: sessionRpeCount ? +(sessionRpeSum / sessionRpeCount).toFixed(2) : null,
+        avgRir: sRirCount ? +(sRirSum / sRirCount).toFixed(2) : null,
+        avgRpe: sRpeCount ? +(sRpeSum / sRpeCount).toFixed(2) : null,
       });
     }
   }
 
   const prs = computeBestForExercise(sessionList);
+  const contribRaw = await getMuscleContributions(exercise);
+  const muscleContributions = Object.entries(contribRaw)
+    .map(([mg, weight]) => ({ muscleGroup: mg, label: labelFor(mg), weight }))
+    .sort((a, b) => b.weight - a.weight);
 
   res.json({
     exercise: {
@@ -233,21 +167,14 @@ export async function getExercise(req, res) {
       variations: exercise.variations,
       keywords: exercise.keywords,
     },
+    muscleContributions,
     stats: {
-      totalSets,
-      totalReps,
-      totalSessions: sessionList.length,
-      totalVolume,
-      maxWeight,
-      best1RM,
-      best5,
-      best10,
-      startingWeight: startingWeight ?? 0,
-      currentBest,
+      totalSets, totalReps, totalSessions: sessionList.length,
+      totalVolume, maxWeight, best1RM, best5, best10,
+      startingWeight: startingWeight ?? 0, currentBest,
       avgRir: rirCount ? +(rirSum / rirCount).toFixed(2) : null,
       avgRpe: rpeCount ? +(rpeSum / rpeCount).toFixed(2) : null,
-      rirDistribution,
-      rpeProgression,
+      rirDistribution, rpeProgression,
     },
     prs,
     sessions: sessionList,

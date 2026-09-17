@@ -12,6 +12,32 @@ import { fmtDate, fmtNumber } from '../lib/format.js';
 const TABS = ['Overview', 'History', 'Progression', 'Intensity', 'PRs'];
 const RANGES = { '30D': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 99999 };
 
+const CONTRIB_COLORS = {
+  neck: '#ffb038',
+  traps: '#c6ff3d',
+  front_delt: '#5ed3ff',
+  side_delt: '#3aa0ff',
+  rear_delt: '#7b8cff',
+  upper_chest: '#ff8f3d',
+  chest: '#ff5e5e',
+  lats: '#b494ff',
+  middle_back: '#9066ff',
+  lower_back: '#6a4dd8',
+  biceps: '#ffa8d8',
+  triceps: '#ff6ec7',
+  forearms: '#d8a8ff',
+  abs: '#88e0c0',
+  obliques: '#5ec9a8',
+  glutes: '#ffd166',
+  quads: '#f7b801',
+  hamstrings: '#e07a00',
+  calves: '#c6a15b',
+};
+
+function contribColor(mg) {
+  return CONTRIB_COLORS[mg] || '#8a93a0';
+}
+
 export default function ExerciseDetail() {
   const { id } = useParams();
   const [tab, setTab] = useState('Overview');
@@ -29,39 +55,33 @@ export default function ExerciseDetail() {
     for (const sess of data.sessions) {
       if (new Date(sess.date) < cutoff) continue;
       const k = new Date(sess.date).toISOString().slice(0, 10);
-      if (!byDay.has(k))
-        byDay.set(k, { date: k, maxWeight: 0, volume: 0, reps: 0, estimated1RM: 0 });
+      if (!byDay.has(k)) byDay.set(k, { date: k, maxWeight: 0, volume: 0, reps: 0, estimated1RM: 0 });
       const d = byDay.get(k);
       for (const s of sess.sets) {
         if (s.weight > d.maxWeight) d.maxWeight = s.weight;
         d.volume += s.weight * s.reps;
         d.reps += s.reps;
-        if (s.estimated1RM && s.estimated1RM > d.estimated1RM)
-          d.estimated1RM = s.estimated1RM;
+        if (s.estimated1RM && s.estimated1RM > d.estimated1RM) d.estimated1RM = s.estimated1RM;
       }
     }
     return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
   }, [data, range]);
 
-  if (loading)
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-64" />
-      </div>
-    );
-  if (error)
-    return (
-      <div className="card p-4 text-red-400 text-sm">
-        {error}{' '}
-        <button className="underline ml-2" onClick={refresh}>
-          Retry
-        </button>
-      </div>
-    );
+  if (loading) return (
+    <div className="space-y-3">
+      <Skeleton className="h-32" />
+      <Skeleton className="h-64" />
+    </div>
+  );
+  if (error) return (
+    <div className="card p-4 text-red-400 text-sm">
+      {error}{' '}
+      <button className="underline ml-2" onClick={refresh}>Retry</button>
+    </div>
+  );
   if (!data?.exercise) return <Empty title="Exercise not found" />;
 
-  const { exercise, stats, prs, sessions } = data;
+  const { exercise, stats, prs, sessions, muscleContributions = [] } = data;
 
   return (
     <div className="space-y-4">
@@ -76,29 +96,46 @@ export default function ExerciseDetail() {
         )}
       </div>
 
+      {muscleContributions.length > 0 && (
+        <div className="card p-4">
+          <div className="font-semibold mb-3">Muscles Worked</div>
+          <div className="space-y-2">
+            {muscleContributions.map((c) => (
+              <div key={c.muscleGroup}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span>{c.label}</span>
+                  <span className="text-ink-400">
+                    {Math.round(c.weight * 100)}%
+                  </span>
+                </div>
+                <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${c.weight * 100}%`,
+                      background: contribColor(c.muscleGroup),
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <StrengthLevelCard exerciseId={exercise.id} />
 
       {exercise.videoUrl && (
         <div className="card p-0 overflow-hidden">
-          <video
-            src={exercise.videoUrl}
-            controls
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full max-h-[600px] bg-black"
-          />
+          <video src={exercise.videoUrl} controls autoPlay loop muted playsInline
+            className="w-full max-h-[600px] bg-black" />
         </div>
       )}
 
       {!exercise.videoUrl && exercise.imageUrl && (
         <div className="card p-0 overflow-hidden">
-          <img
-            src={exercise.imageUrl}
-            alt={exercise.name}
-            className="w-full max-h-[500px] object-cover bg-ink-800"
-          />
+          <img src={exercise.imageUrl} alt={exercise.name}
+            className="w-full max-h-[500px] object-cover bg-ink-800" />
         </div>
       )}
 
@@ -106,9 +143,7 @@ export default function ExerciseDetail() {
         <div className="card p-4">
           <div className="font-semibold mb-2">Cách thực hiện</div>
           <ol className="list-decimal ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.instructions.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
+            {exercise.instructions.map((s, i) => (<li key={i}>{s}</li>))}
           </ol>
         </div>
       )}
@@ -117,9 +152,7 @@ export default function ExerciseDetail() {
         <div className="card p-4">
           <div className="font-semibold mb-2">Tips</div>
           <ul className="list-disc ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.exerciseTips.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
+            {exercise.exerciseTips.map((s, i) => (<li key={i}>{s}</li>))}
           </ul>
         </div>
       )}
@@ -128,9 +161,7 @@ export default function ExerciseDetail() {
         <div className="card p-4">
           <div className="font-semibold mb-2">Biến thể</div>
           <ul className="list-disc ml-5 text-sm text-ink-300 space-y-1">
-            {exercise.variations.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
+            {exercise.variations.map((s, i) => (<li key={i}>{s}</li>))}
           </ul>
         </div>
       )}
@@ -148,15 +179,10 @@ export default function ExerciseDetail() {
 
       <div className="flex gap-1 border-b border-ink-700 overflow-x-auto">
         {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
+          <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm whitespace-nowrap ${
-              tab === t
-                ? 'text-accent border-b-2 border-accent'
-                : 'text-ink-400 hover:text-white'
-            }`}
-          >
+              tab === t ? 'text-accent border-b-2 border-accent' : 'text-ink-400 hover:text-white'
+            }`}>
             {t}
           </button>
         ))}
@@ -166,11 +192,9 @@ export default function ExerciseDetail() {
         <div className="space-y-3">
           <div className="flex gap-1 flex-wrap">
             {Object.keys(RANGES).map((r) => (
-              <button
-                key={r}
+              <button key={r}
                 className={`chip ${range === r ? 'border-accent text-accent' : ''}`}
-                onClick={() => setRange(r)}
-              >
+                onClick={() => setRange(r)}>
                 {r}
               </button>
             ))}
@@ -182,31 +206,25 @@ export default function ExerciseDetail() {
             </div>
             <div className="card p-4">
               <div className="text-sm mb-2 text-ink-300">Estimated 1RM over time</div>
-              <LineChartCard
-                data={progression}
-                lines={[{ key: 'estimated1RM', name: '1RM', color: '#ffb038' }]}
-              />
+              <LineChartCard data={progression}
+                lines={[{ key: 'estimated1RM', name: '1RM', color: '#ffb038' }]} />
             </div>
             <div className="card p-4">
               <div className="text-sm mb-2 text-ink-300">Volume over time</div>
-              <LineChartCard
-                data={progression}
-                lines={[{ key: 'volume', name: 'kg', color: '#5ed3ff' }]}
-              />
+              <LineChartCard data={progression}
+                lines={[{ key: 'volume', name: 'kg', color: '#5ed3ff' }]} />
             </div>
             <div className="card p-4">
               <div className="text-sm mb-2 text-ink-300">Reps over time</div>
-              <LineChartCard
-                data={progression}
-                lines={[{ key: 'reps', name: 'reps', color: '#b494ff' }]}
-              />
+              <LineChartCard data={progression}
+                lines={[{ key: 'reps', name: 'reps', color: '#b494ff' }]} />
             </div>
           </div>
         </div>
       )}
 
-      {tab === 'History' &&
-        (sessions.length ? (
+      {tab === 'History' && (
+        sessions.length ? (
           <div className="space-y-2">
             {[...sessions].reverse().map((s) => (
               <div key={s.workoutId} className="card p-4">
@@ -220,64 +238,44 @@ export default function ExerciseDetail() {
                       {i + 1}. {set.weight}kg × {set.reps}
                       {set.rir != null ? ` (RIR ${set.rir})` : ''}
                       {set.rpe != null ? ` (RPE ${set.rpe})` : ''}
-                      {set.estimated1RM
-                        ? ` · ${set.estimated1RM.toFixed(1)} 1RM`
-                        : ''}
+                      {set.estimated1RM ? ` · ${set.estimated1RM.toFixed(1)} 1RM` : ''}
                     </div>
                   ))}
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <Empty title="No history yet" />
-        ))}
+        ) : <Empty title="No history yet" />
+      )}
 
       {tab === 'Progression' && (
         <div className="card p-4">
           <div className="text-sm mb-2 text-ink-300">Weight progression</div>
-          <LineChartCard
-            data={progression}
-            lines={[{ key: 'maxWeight', name: 'kg' }]}
-            height={320}
-          />
+          <LineChartCard data={progression}
+            lines={[{ key: 'maxWeight', name: 'kg' }]} height={320} />
         </div>
       )}
 
       {tab === 'Intensity' && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="Avg RIR"
+            <StatCard label="Avg RIR"
               value={stats.avgRir != null ? stats.avgRir.toFixed(2) : '—'}
-              sub="Lower = closer to failure"
-            />
-            <StatCard
-              label="Avg RPE"
+              sub="Lower = closer to failure" />
+            <StatCard label="Avg RPE"
               value={stats.avgRpe != null ? stats.avgRpe.toFixed(2) : '—'}
-              sub="10 = max effort"
-            />
+              sub="10 = max effort" />
           </div>
-
           {stats.rpeProgression?.length > 0 ? (
             <div className="card p-4">
               <div className="text-sm mb-2 text-ink-300">RIR / RPE over time</div>
-              <LineChartCard
-                data={stats.rpeProgression}
-                xKey="date"
+              <LineChartCard data={stats.rpeProgression} xKey="date"
                 lines={[
                   { key: 'avgRir', name: 'RIR', color: '#c6ff3d' },
                   { key: 'avgRpe', name: 'RPE', color: '#5ed3ff' },
-                ]}
-                height={320}
-              />
+                ]} height={320} />
             </div>
-          ) : (
-            <Empty
-              title="No RIR/RPE data"
-              hint="Log RIR or RPE in sets to see trend."
-            />
-          )}
+          ) : <Empty title="No RIR/RPE data" hint="Log RIR or RPE in sets to see trend." />}
 
           {Object.keys(stats.rirDistribution || {}).length > 0 && (
             <div className="card p-4">
@@ -290,17 +288,12 @@ export default function ExerciseDetail() {
                     return (
                       <div key={rir}>
                         <div className="flex justify-between text-xs mb-1">
-                          <span>
-                            RIR {rir}
-                            {rir === '0' && ' (failure)'}
-                          </span>
+                          <span>RIR {rir}{rir === '0' && ' (failure)'}</span>
                           <span className="text-ink-400">{count} sets</span>
                         </div>
                         <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent rounded-full"
-                            style={{ width: `${(count / max) * 100}%` }}
-                          />
+                          <div className="h-full bg-accent rounded-full"
+                            style={{ width: `${(count / max) * 100}%` }} />
                         </div>
                       </div>
                     );
@@ -311,29 +304,24 @@ export default function ExerciseDetail() {
         </div>
       )}
 
-      {tab === 'PRs' &&
-        (prs.length ? (
+      {tab === 'PRs' && (
+        prs.length ? (
           <div className="space-y-2">
             {prs.map((p) => (
               <div key={p.id} className="card p-3 flex items-center justify-between">
                 <div>
-                  <div className="text-sm capitalize">
-                    {p.type.replace('_', ' ')}
-                  </div>
+                  <div className="text-sm capitalize">{p.type.replace('_', ' ')}</div>
                   <div className="text-xs text-ink-400">
                     {fmtDate(p.achievedAt)}
                     {p.reps ? ` · ${p.weight}kg × ${p.reps}` : ''}
                   </div>
                 </div>
-                <div className="text-accent font-semibold">
-                  {fmtNumber(p.value, 1)}
-                </div>
+                <div className="text-accent font-semibold">{fmtNumber(p.value, 1)}</div>
               </div>
             ))}
           </div>
-        ) : (
-          <Empty title="No PRs yet" />
-        ))}
+        ) : <Empty title="No PRs yet" />
+      )}
     </div>
   );
 }

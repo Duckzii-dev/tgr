@@ -1,10 +1,10 @@
 import { prisma } from '../utils/prisma.js';
+import { volume, dateKeyInTz, yearMonthInTz, isoWeekInTz } from '../utils/calc.js';
 import {
-  volume,
-  dateKeyInTz,
-  yearMonthInTz,
-  isoWeekInTz,
-} from '../utils/calc.js';
+  getMuscleContributions,
+  MUSCLE_GROUPS_DETAILED,
+  RECOVERY_HOURS,
+} from '../services/muscle.service.js';
 
 function rangeFrom(query) {
   const { from, to } = query;
@@ -24,33 +24,6 @@ async function getUserTz(userId) {
 
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Định nghĩa recovery time theo muscle group (giờ)
-// Tham khảo: compound lớn 72h, isolation nhỏ 48h, core 24h, cardio 24h
-const RECOVERY_HOURS = {
-  chest: 72,
-  back: 72,
-  legs: 72,
-  shoulders: 48,
-  biceps: 48,
-  triceps: 48,
-  arms: 48,
-  core: 24,
-  abs: 24,
-  cardio: 24,
-  other: 48,
-};
-
-const MUSCLE_GROUPS = [
-  'chest',
-  'back',
-  'shoulders',
-  'biceps',
-  'triceps',
-  'legs',
-  'core',
-  'cardio',
-];
-
 export async function analyticsOverview(req, res) {
   const userId = req.user.id;
   const { from, to } = rangeFrom(req.query);
@@ -62,10 +35,7 @@ export async function analyticsOverview(req, res) {
     orderBy: { date: 'asc' },
   });
 
-  let totalSets = 0;
-  let totalReps = 0;
-  let totalVolume = 0;
-  let totalDuration = 0;
+  let totalSets = 0, totalReps = 0, totalVolume = 0, totalDuration = 0;
   const muscleVolume = {};
   const exerciseFreq = {};
   const weekly = {};
@@ -73,30 +43,20 @@ export async function analyticsOverview(req, res) {
 
   const byDayOfWeek = {};
   const byWeek = {};
-
   for (let i = 0; i < 7; i++) {
     byDayOfWeek[DOW_LABELS[i]] = {
-      dow: DOW_LABELS[i],
-      sets: 0,
-      reps: 0,
-      volume: 0,
-      rirSum: 0,
-      rirCount: 0,
-      workoutCount: 0,
+      dow: DOW_LABELS[i], sets: 0, reps: 0, volume: 0,
+      rirSum: 0, rirCount: 0, workoutCount: 0,
     };
   }
 
-  // Recovery aggregation
   const now = new Date();
   const recovery = {};
-  for (const mg of MUSCLE_GROUPS) {
+  for (const mg of MUSCLE_GROUPS_DETAILED) {
     recovery[mg] = {
       muscleGroup: mg,
       lastTrainedAt: null,
-      sets7d: 0,
-      sets30d: 0,
-      volume7d: 0,
-      volume30d: 0,
+      sets7d: 0, sets30d: 0, volume7d: 0, volume30d: 0,
       recoveryHours: RECOVERY_HOURS[mg] || 48,
     };
   }
@@ -116,19 +76,13 @@ export async function analyticsOverview(req, res) {
 
     const dateKey = dateKeyInTz(w.date, tz);
     const dowIdx = new Date(dateKey + 'T12:00:00Z').getUTCDay();
-    const dowLabel = DOW_LABELS[dowIdx];
-    const dowBucket = byDayOfWeek[dowLabel];
+    const dowBucket = byDayOfWeek[DOW_LABELS[dowIdx]];
     dowBucket.workoutCount += 1;
 
     if (!byWeek[wk]) {
       byWeek[wk] = {
-        week: wk,
-        sets: 0,
-        reps: 0,
-        volume: 0,
-        rirSum: 0,
-        rirCount: 0,
-        workoutCount: 0,
+        week: wk, sets: 0, reps: 0, volume: 0,
+        rirSum: 0, rirCount: 0, workoutCount: 0,
       };
     }
     const weekBucket = byWeek[wk];
@@ -140,14 +94,7 @@ export async function analyticsOverview(req, res) {
 
     for (const we of w.exercises) {
       exerciseFreq[we.exercise.name] = (exerciseFreq[we.exercise.name] || 0) + 1;
-
-      const mg = we.exercise.muscleGroup;
-      const rec = recovery[mg];
-      if (rec) {
-        if (!rec.lastTrainedAt || workoutDate > new Date(rec.lastTrainedAt)) {
-          rec.lastTrainedAt = workoutDate.toISOString();
-        }
-      }
+      const contrib = await getMuscleContributions(we.exercise);
 
       for (const s of we.sets) {
         if (s.isWarmup) continue;
@@ -156,33 +103,32 @@ export async function analyticsOverview(req, res) {
         totalReps += s.reps;
         const v = volume(s.weight, s.reps);
         totalVolume += v;
-        muscleVolume[mg] = (muscleVolume[mg] || 0) + v;
 
         dowBucket.sets += 1;
         dowBucket.reps += s.reps;
         dowBucket.volume += v;
-        if (s.rir != null) {
-          dowBucket.rirSum += s.rir;
-          dowBucket.rirCount += 1;
-        }
+        if (s.rir != null) { dowBucket.rirSum += s.rir; dowBucket.rirCount += 1; }
 
         weekBucket.sets += 1;
         weekBucket.reps += s.reps;
         weekBucket.volume += v;
-        if (s.rir != null) {
-          weekBucket.rirSum += s.rir;
-          weekBucket.rirCount += 1;
-        }
+        if (s.rir != null) { weekBucket.rirSum += s.rir; weekBucket.rirCount += 1; }
 
-        if (rec) {
+        for (const [mg, weight] of Object.entries(contrib)) {
+          if (!(mg in recovery)) continue;
+          const rec = recovery[mg];
+          if (!rec.lastTrainedAt || workoutDate > new Date(rec.lastTrainedAt)) {
+            rec.lastTrainedAt = workoutDate.toISOString();
+          }
           if (isWithin7d) {
-            rec.sets7d += 1;
-            rec.volume7d += v;
+            rec.sets7d += weight;
+            rec.volume7d += v * weight;
           }
           if (isWithin30d) {
-            rec.sets30d += 1;
-            rec.volume30d += v;
+            rec.sets30d += weight;
+            rec.volume30d += v * weight;
           }
+          muscleVolume[mg] = (muscleVolume[mg] || 0) + v * weight;
         }
       }
     }
@@ -193,10 +139,7 @@ export async function analyticsOverview(req, res) {
   const trainingLoadByDow = DOW_LABELS.map((label) => {
     const b = byDayOfWeek[label];
     return {
-      dow: label,
-      sets: b.sets,
-      reps: b.reps,
-      volume: b.volume,
+      dow: label, sets: b.sets, reps: b.reps, volume: b.volume,
       avgRir: b.rirCount ? +(b.rirSum / b.rirCount).toFixed(2) : null,
       workoutCount: b.workoutCount,
     };
@@ -204,20 +147,14 @@ export async function analyticsOverview(req, res) {
 
   const trainingLoadByWeek = Object.values(byWeek)
     .map((b) => ({
-      week: b.week,
-      sets: b.sets,
-      reps: b.reps,
-      volume: b.volume,
+      week: b.week, sets: b.sets, reps: b.reps, volume: b.volume,
       avgRir: b.rirCount ? +(b.rirSum / b.rirCount).toFixed(2) : null,
       workoutCount: b.workoutCount,
     }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
-  // Recovery: compute percentage
   const recoveryList = Object.values(recovery).map((r) => {
-    let percent = 100;
-    let hoursSince = null;
-    let hoursRemaining = null;
+    let percent = 100, hoursSince = null, hoursRemaining = null;
     if (r.lastTrainedAt) {
       hoursSince = (now - new Date(r.lastTrainedAt)) / 3600000;
       const ratio = Math.min(1, hoursSince / r.recoveryHours);
@@ -227,10 +164,10 @@ export async function analyticsOverview(req, res) {
     return {
       muscleGroup: r.muscleGroup,
       lastTrainedAt: r.lastTrainedAt,
-      sets7d: r.sets7d,
-      sets30d: r.sets30d,
-      volume7d: r.volume7d,
-      volume30d: r.volume30d,
+      sets7d: +r.sets7d.toFixed(1),
+      sets30d: +r.sets30d.toFixed(1),
+      volume7d: Math.round(r.volume7d),
+      volume30d: Math.round(r.volume30d),
       recoveryHours: r.recoveryHours,
       hoursSince: hoursSince != null ? +hoursSince.toFixed(1) : null,
       hoursRemaining,
@@ -240,17 +177,11 @@ export async function analyticsOverview(req, res) {
 
   res.json({
     totalWorkouts: workouts.length,
-    totalSets,
-    totalReps,
-    totalVolume,
-    totalDuration,
+    totalSets, totalReps, totalVolume, totalDuration,
     avgSession: workouts.length ? Math.round(totalDuration / workouts.length) : 0,
     minSession: durations.length ? Math.min(...durations) : 0,
     maxSession: durations.length ? Math.max(...durations) : 0,
-    muscleVolume: Object.entries(muscleVolume).map(([muscleGroup, v]) => ({
-      muscleGroup,
-      volume: v,
-    })),
+    muscleVolume: Object.entries(muscleVolume).map(([muscleGroup, v]) => ({ muscleGroup, volume: v })),
     exerciseFrequency: Object.entries(exerciseFreq)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count),
@@ -279,26 +210,17 @@ export async function streak(req, res) {
     const d = new Date(today);
     d.setUTCDate(d.getUTCDate() - i);
     const k = d.toISOString().slice(0, 10);
-    if (dates.has(k)) {
-      current++;
-    } else if (i === 0) {
-      continue;
-    } else {
-      break;
-    }
+    if (dates.has(k)) current++;
+    else if (i === 0) continue;
+    else break;
   }
 
-  let longest = 0;
-  let run = 0;
-  let prev = null;
-  const sorted = [...dates].sort();
-  for (const k of sorted) {
+  let longest = 0, run = 0, prev = null;
+  for (const k of [...dates].sort()) {
     if (prev) {
       const diff = (new Date(k) - new Date(prev)) / 86400000;
       run = diff === 1 ? run + 1 : 1;
-    } else {
-      run = 1;
-    }
+    } else run = 1;
     prev = k;
     if (run > longest) longest = run;
   }
