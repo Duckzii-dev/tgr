@@ -2,19 +2,15 @@ import { httpError } from '../middleware/error.middleware.js';
 import {
   searchLocalExercises,
   getLocalExercise,
-  getExerciseWithSvg,
   listFacets,
   loadAnatomeExercises,
 } from '../services/anatome.service.js';
 
 export async function searchExercises(req, res) {
-  const { q, bodyPart, equipment, muscleSlug, difficulty, category, limit, offset } = req.query;
+  const { q, bodyPart, muscleSlug, limit, offset } = req.query;
   const result = await searchLocalExercises(q, {
     bodyPart: bodyPart || null,
-    equipment: equipment || null,
     muscleSlug: muscleSlug || null,
-    difficulty: difficulty || null,
-    category: category || null,
     limit: limit ? Math.min(200, Number(limit)) : 50,
     offset: offset ? Number(offset) : 0,
   });
@@ -24,17 +20,6 @@ export async function searchExercises(req, res) {
 export async function getExercise(req, res) {
   const { id } = req.params;
   const exercise = await getLocalExercise(id);
-  if (!exercise) throw httpError(404, 'Exercise not found');
-  res.json({ exercise });
-}
-
-/**
- * Trả về exercise + SVG inline.
- * Client có thể inject SVG trực tiếp vào DOM.
- */
-export async function getExerciseWithSvgInline(req, res) {
-  const { id } = req.params;
-  const exercise = await getExerciseWithSvg(id);
   if (!exercise) throw httpError(404, 'Exercise not found');
   res.json({ exercise });
 }

@@ -8,7 +8,6 @@ r.use(requireAuth);
 
 r.get('/exercises', asyncHandler(c.searchExercises));
 r.get('/exercises/:id', asyncHandler(c.getExercise));
-r.get('/exercises/:id/with-svg', asyncHandler(c.getExerciseWithSvgInline));
 r.get('/facets', asyncHandler(c.facets));
 r.get('/meta', asyncHandler(c.meta));
 

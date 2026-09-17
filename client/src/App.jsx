@@ -20,6 +20,7 @@ import Settings from './pages/Settings.jsx';
 import Admin from './pages/Admin.jsx';
 import AdminUserDetail from './pages/AdminUserDetail.jsx';
 import StrengthLevels from './pages/StrengthLevels.jsx';
+import AnatomeLibrary from './pages/AnatomeLibrary.jsx';
 
 const P = ({ children }) => (
   <ProtectedRoute>
@@ -46,6 +47,7 @@ export default function App() {
       <Route path="/workouts/:id" element={<P><WorkoutDetail /></P>} />
       <Route path="/exercises" element={<P><Exercises /></P>} />
       <Route path="/exercises/:id" element={<P><ExerciseDetail /></P>} />
+      <Route path="/library" element={<P><AnatomeLibrary /></P>} />
       <Route path="/progress" element={<P><Progress /></P>} />
       <Route path="/analytics" element={<P><Analytics /></P>} />
       <Route path="/prs" element={<P><PRs /></P>} />
@@ -54,9 +56,7 @@ export default function App() {
       <Route path="/settings" element={<P><Settings /></P>} />
       <Route path="/strength" element={<P><StrengthLevels /></P>} />
 
-      {/* Redirect các route cũ về /exercises */}
-      <Route path="/library" element={<Navigate to="/exercises" replace />} />
-      <Route path="/import-exercises" element={<Navigate to="/exercises" replace />} />
+      <Route path="/import-exercises" element={<Navigate to="/library" replace />} />
 
       <Route path="/admin" element={<A><Admin /></A>} />
       <Route path="/admin/users/:id" element={<A><AdminUserDetail /></A>} />

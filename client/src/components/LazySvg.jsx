@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { slugifyId } from '../lib/svgUtils.js';
-
-/**
- * Lazy load SVG khi element vào viewport.
- * Cache SVG string để không fetch lại.
- */
 
 const svgCache = new Map();
 
-export default function LazySvg({ exerciseId, className, style, alt }) {
+function slugifyId(id) {
+  return String(id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+export default function LazySvg({ exerciseId, className }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
   const [svg, setSvg] = useState(() => svgCache.get(exerciseId) || null);
@@ -19,30 +17,25 @@ export default function LazySvg({ exerciseId, className, style, alt }) {
     const el = ref.current;
     if (!el) return;
 
-    const observer = new IntersectionObserver(
+    const obs = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setVisible(true);
-            observer.disconnect();
-            break;
-          }
+        if (entries[0].isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
         }
       },
       { rootMargin: '200px' }
     );
 
-    observer.observe(el);
-    return () => observer.disconnect();
+    obs.observe(el);
+    return () => obs.disconnect();
   }, [svg]);
 
   useEffect(() => {
     if (!visible || svg) return;
     let cancelled = false;
     const slug = slugifyId(exerciseId);
-    const url = `/static/muscle-maps/${slug}.svg`;
-
-    fetch(url)
+    fetch(`/static/muscle-maps/${slug}.svg`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.text();
@@ -51,20 +44,18 @@ export default function LazySvg({ exerciseId, className, style, alt }) {
         if (cancelled) return;
         const cleaned = text
           .replace(/<\?xml[^?]*\?>/g, '')
-          .replace(/<!--[\s\S]*?-->/g, '')
+          .replace(/<--- 38.46.226.72 ping statistics[\s\S]*?-->/g, '')
           .trim();
         svgCache.set(exerciseId, cleaned);
         setSvg(cleaned);
       })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
+      .catch(() => { if (!cancelled) setError(true); });
 
     return () => { cancelled = true; };
   }, [visible, svg, exerciseId]);
 
   return (
-    <div ref={ref} className={className} style={style}>
+    <div ref={ref} className={className}>
       {svg ? (
         <div
           className="w-full h-full flex items-center justify-center"

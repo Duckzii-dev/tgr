@@ -1,48 +1,99 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Filter, X, Play, Activity, BookOpen, Loader } from 'lucide-react';
+import { Search, X, Play, Activity, BookOpen, Loader, Filter } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
-import { useInfiniteExercises } from '../hooks/useInfiniteExercises.js';
 import Skeleton from '../components/Skeleton.jsx';
 import Empty from '../components/Empty.jsx';
 import Modal from '../components/Modal.jsx';
 import LazySvg from '../components/LazySvg.jsx';
 import { fmtNumber } from '../lib/format.js';
-import { svgUrl, fetchSvg } from '../lib/svgUtils.js';
+
+const PAGE_SIZE = 50;
+
+const BODY_PARTS = [
+  { key: '', label: 'All' },
+  { key: 'chest', label: 'Chest' },
+  { key: 'back', label: 'Back' },
+  { key: 'shoulders', label: 'Shoulders' },
+  { key: 'biceps', label: 'Biceps' },
+  { key: 'triceps', label: 'Triceps' },
+  { key: 'legs', label: 'Legs' },
+  { key: 'core', label: 'Core' },
+  { key: 'cardio', label: 'Cardio' },
+  { key: 'stretch', label: 'Stretch' },
+  { key: 'other', label: 'Other' },
+];
 
 export default function AnatomeLibrary() {
   const [q, setQ] = useState('');
-  const [muscleSlug, setMuscleSlug] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [bodyPart, setBodyPart] = useState('');
   const [detail, setDetail] = useState(null);
 
-  const facets = useFetch(() => api.get('/anatome/facets'), []);
-  const meta = useFetch(() => api.get('/anatome/meta'), []);
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState(null);
 
-  const { items, total, loading, error, hasMore, loadMore } = useInfiniteExercises({
-    q,
-    muscleSlug,
-  });
-
+  const offsetRef = useRef(0);
   const sentinelRef = useRef(null);
 
-  // Infinite scroll với IntersectionObserver
+  const meta = useFetch(() => api.get('/anatome/meta'), []);
+
+  // Reset khi filter đổi
+  useEffect(() => {
+    setItems([]);
+    setTotal(0);
+    setHasMore(true);
+    offsetRef.current = 0;
+    setError(null);
+  }, [q, bodyPart]);
+
+  const loadMore = async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+
+    const offset = offsetRef.current;
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (bodyPart) p.set('bodyPart', bodyPart);
+    p.set('limit', String(PAGE_SIZE));
+    p.set('offset', String(offset));
+
+    try {
+      const res = await api.get(`/anatome/exercises?${p}`);
+      const list = res.exercises || [];
+      const tot = res.total || 0;
+      setItems((prev) => (offset === 0 ? list : [...prev, ...list]));
+      setTotal(tot);
+      offsetRef.current = offset + list.length;
+      setHasMore(offset + list.length < tot);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (offsetRef.current === 0 && items.length === 0) {
+      loadMore();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, bodyPart]);
+
   useEffect(() => {
     if (!hasMore || loading) return;
     const el = sentinelRef.current;
     if (!el) return;
-
-    const observer = new IntersectionObserver(
+    const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMore();
-        }
+        if (entries[0].isIntersecting) loadMore();
       },
       { rootMargin: '400px' }
     );
-
-    observer.observe(el);
-    return () => observer.disconnect();
+    obs.observe(el);
+    return () => obs.disconnect();
   }, [hasMore, loading, loadMore]);
 
   return (
@@ -58,56 +109,33 @@ export default function AnatomeLibrary() {
       </div>
 
       <div className="card p-4 space-y-3">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
-            <input
-              className="input pl-9"
-              placeholder="Tìm bài tập (vd: bench, squat, curl)..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
-          <button
-            className={`btn btn-ghost ${showFilters ? 'border-accent text-accent' : ''}`}
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            <Filter className="w-4 h-4" /> Muscle
-          </button>
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
+          <input
+            className="input pl-9"
+            placeholder="Tìm bài tập (bench, squat, curl...)"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
 
-        {showFilters && (
-          <div className="pt-2 border-t border-ink-700">
-            <label className="label">Muscle</label>
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {muscleSlug && (
-                <button
-                  className="chip border-accent text-accent"
-                  onClick={() => setMuscleSlug('')}
-                >
-                  <X className="w-3 h-3" /> {muscleSlug}
-                </button>
-              )}
-              {(facets.data?.muscleSlugs || []).slice(0, 40).map((m) => (
-                <button
-                  key={m}
-                  className={`chip ${muscleSlug === m ? 'border-accent text-accent' : ''}`}
-                  onClick={() => setMuscleSlug(muscleSlug === m ? '' : m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          {BODY_PARTS.map((bp) => (
+            <button
+              key={bp.key}
+              className={`chip ${bodyPart === bp.key ? 'border-accent text-accent' : ''}`}
+              onClick={() => setBodyPart(bp.key)}
+            >
+              {bp.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
         <div className="card p-4 text-red-400 text-sm">
           {error}{' '}
-          <button className="underline ml-2" onClick={() => loadMore()}>
-            Retry
-          </button>
+          <button className="underline ml-2" onClick={loadMore}>Retry</button>
         </div>
       )}
 
@@ -124,7 +152,32 @@ export default function AnatomeLibrary() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {items.map((ex) => (
-              <ExerciseCard key={ex.id} ex={ex} onClick={() => setDetail(ex)} />
+              <button
+                key={ex.id}
+                onClick={() => setDetail(ex)}
+                className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
+              >
+                <div className="relative bg-ink-950 rounded-lg h-40 overflow-hidden">
+                  <LazySvg exerciseId={ex.id} className="w-full h-full p-2" />
+                </div>
+
+                <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
+                  {ex.name}
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {ex.bodyPart && (
+                    <span className="chip text-[10px] capitalize">{ex.bodyPart}</span>
+                  )}
+                </div>
+
+                {ex.primaryMuscles?.length > 0 && (
+                  <div className="text-xs text-accent line-clamp-1 flex items-center gap-1">
+                    <Activity className="w-3 h-3 shrink-0" />
+                    <span>{ex.primaryMuscles.slice(0, 3).join(', ')}</span>
+                  </div>
+                )}
+              </button>
             ))}
           </div>
 
@@ -132,24 +185,22 @@ export default function AnatomeLibrary() {
             <div ref={sentinelRef} className="flex justify-center py-6">
               {loading ? (
                 <div className="flex items-center gap-2 text-ink-400 text-sm">
-                  <Loader className="w-4 h-4 animate-spin" /> Đang tải thêm...
+                  <Loader className="w-4 h-4 animate-spin" /> Đang tải...
                 </div>
               ) : (
-                <button className="btn btn-ghost" onClick={loadMore}>
-                  Load more
-                </button>
+                <button className="btn btn-ghost" onClick={loadMore}>Load more</button>
               )}
             </div>
           )}
 
-          {!hasMore && items.length >= total && total > 50 && (
+          {!hasMore && items.length >= total && total > PAGE_SIZE && (
             <div className="text-center text-xs text-ink-500 py-4">
               Đã hiển thị toàn bộ {total} bài tập
             </div>
           )}
         </>
       ) : (
-        <Empty title="Không tìm thấy bài tập" hint="Thử đổi từ khoá." icon={Search} />
+        <Empty title="Không có bài tập" hint="Thử đổi filter." icon={Search} />
       )}
 
       <Modal
@@ -164,43 +215,23 @@ export default function AnatomeLibrary() {
   );
 }
 
-function ExerciseCard({ ex, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
-    >
-      <div className="relative bg-ink-950 rounded-lg h-40 overflow-hidden">
-        <LazySvg exerciseId={ex.id} className="w-full h-full p-2" />
-      </div>
-
-      <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
-        {ex.name}
-      </div>
-
-      {ex.primaryMuscles?.length > 0 && (
-        <div className="text-xs text-accent line-clamp-2 flex items-start gap-1">
-          <Activity className="w-3 h-3 shrink-0 mt-0.5" />
-          <span>{ex.primaryMuscles.slice(0, 3).join(', ')}</span>
-        </div>
-      )}
-    </button>
-  );
-}
-
 function ExerciseDetailContent({ ex }) {
   const [svg, setSvg] = useState(null);
   const [svgLoading, setSvgLoading] = useState(true);
-  const [hoveredMuscle, setHoveredMuscle] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchSvg(ex.id)
+    const slug = String(ex.id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
+    fetch(`/static/muscle-maps/${slug}.svg`)
+      .then((r) => r.text())
       .then((text) => {
-        if (!cancelled) {
-          setSvg(text);
-          setSvgLoading(false);
-        }
+        if (cancelled) return;
+        const cleaned = text
+          .replace(/<\?xml[^?]*\?>/g, '')
+          .replace(/<--- 38.46.226.72 ping statistics[\s\S]*?-->/g, '')
+          .trim();
+        setSvg(cleaned);
+        setSvgLoading(false);
       })
       .catch(() => setSvgLoading(false));
     return () => { cancelled = true; };
@@ -213,34 +244,9 @@ function ExerciseDetailContent({ ex }) {
           <div className="label">Primary Muscles</div>
           <div className="flex flex-wrap gap-1.5">
             {ex.primaryMuscles.map((m) => (
-              <button
-                key={m}
-                className={`chip ${
-                  hoveredMuscle === m ? 'border-accent text-accent' : ''
-                }`}
-                onMouseEnter={() => setHoveredMuscle(m)}
-                onMouseLeave={() => setHoveredMuscle(null)}
-              >
+              <span key={m} className="chip border-accent text-accent">
                 <Activity className="w-3 h-3" /> {m}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {ex.secondaryMuscles?.length > 0 && (
-        <div>
-          <div className="label">Secondary Muscles</div>
-          <div className="flex flex-wrap gap-1.5">
-            {ex.secondaryMuscles.map((m) => (
-              <button
-                key={m}
-                className="chip text-ink-400"
-                onMouseEnter={() => setHoveredMuscle(m)}
-                onMouseLeave={() => setHoveredMuscle(null)}
-              >
-                {m}
-              </button>
+              </span>
             ))}
           </div>
         </div>
@@ -267,25 +273,14 @@ function ExerciseDetailContent({ ex }) {
         </div>
       </div>
 
-      {ex.instructions?.length > 0 && (
-        <div>
-          <div className="label">Instructions</div>
-          <ol className="list-decimal ml-5 text-sm text-ink-300 space-y-1">
-            {ex.instructions.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {ex.videoUrl && (
+      {ex.svgPath && (
         <a
-          href={ex.videoUrl}
+          href={ex.svgPath}
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-ghost w-full justify-center"
         >
-          <Play className="w-4 h-4" /> Watch on YouTube
+          Open SVG in new tab
         </a>
       )}
     </div>

@@ -1,14 +1,3 @@
-#!/usr/bin/env bash
-# ================================================================
-# FEATURE 32: FINAL CLASSIFY v5 — other < 5
-# Chạy từ ~/Code/tgr: bash feature32.sh
-# ================================================================
-set -euo pipefail
-
-TGR_DIR="$HOME/Code/tgr"
-cd "$TGR_DIR"
-
-cat > server/scripts/classify-from-filename.js <<'EOF'
 #!/usr/bin/env node
 
 import fs from 'fs/promises';
@@ -224,7 +213,3 @@ async function main() {
 }
 
 main().catch(e => { console.error('❌', e); process.exit(1); });
-EOF
-
-cd ~/Code/tgr
-node server/scripts/classify-from-filename.js
