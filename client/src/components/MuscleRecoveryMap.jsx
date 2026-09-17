@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { fmtNumber } from '../lib/format.js';
 import { Info, X } from 'lucide-react';
-import BodyMusclesChart from './BodyMusclesChart.jsx';
+import MuscleMapChart from './MuscleMapChart.jsx';
 
 const LABELS = {
   neck: 'Neck', traps: 'Traps',
@@ -33,7 +33,7 @@ function fmtHours(h) {
 export default function MuscleRecoveryMap({ recovery = [] }) {
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [view, setView] = useState('FRONT');
+  const [view, setView] = useState('front');
 
   const byGroup = {};
   for (const r of recovery) byGroup[r.muscleGroup] = r;
@@ -107,7 +107,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
         {/* Left: Body chart */}
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-2 bg-ink-850 rounded-full p-1 border border-ink-700">
-            {['FRONT', 'BACK'].map((v) => (
+            {['front', 'back'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -117,12 +117,12 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                     : 'text-ink-400 hover:text-white'
                 }`}
               >
-                {v === 'FRONT' ? 'Front' : 'Back'}
+                {v === 'front' ? 'Front' : 'Back'}
               </button>
             ))}
           </div>
 
-          <BodyMusclesChart
+          <MuscleMapChart
             recovery={recovery}
             view={view}
             selectedSlug={selected}
