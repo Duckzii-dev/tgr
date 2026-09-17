@@ -12,7 +12,7 @@ const BASE_NAV = [
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },
   { to: '/exercises', label: 'Exercises', icon: Activity },
-  { to: '/import-exercises', label: 'Library', icon: Library },
+  { to: '/library', label: 'Library', icon: Library },
   { to: '/strength', label: 'Strength', icon: Zap },
   { to: '/progress', label: 'Progress', icon: LineChart },
   { to: '/analytics', label: 'Analytics', icon: Activity },
