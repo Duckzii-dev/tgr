@@ -1,43 +1,43 @@
 {
   "_meta": {
-    "source": "detailed-classification-v7",
-    "generatedAt": "2026-09-17T08:56:41.377Z",
+    "source": "detailed-classification-v8",
+    "generatedAt": "2026-09-17T08:59:39.969Z",
     "totalExercises": 879,
     "byGroup": {
-      "core": 84,
-      "cardio": 23,
+      "core": 91,
+      "cardio": 22,
       "stretch": 57,
-      "back": 144,
-      "chest": 127,
-      "shoulders": 93,
-      "legs": 121,
+      "back": 133,
+      "chest": 122,
+      "legs": 124,
       "triceps": 87,
-      "biceps": 103,
+      "biceps": 102,
+      "shoulders": 90,
       "forearms": 18,
-      "other": 22
+      "other": 33
     },
     "bySlug": {
-      "abs": 70,
-      "cardio": 23,
+      "abs": 77,
+      "cardio": 22,
       "mobility": 57,
-      "lats": 50,
-      "chest": 109,
-      "front-delts": 61,
-      "side-delts": 71,
-      "middle-back": 59,
+      "lats": 40,
+      "chest": 104,
       "obliques": 14,
-      "hamstrings": 5,
-      "triceps": 98,
-      "lower-back": 28,
-      "biceps": 103,
+      "hamstrings": 6,
+      "triceps": 93,
+      "lower-back": 30,
+      "biceps": 102,
       "glutes": 12,
-      "quadriceps": 63,
+      "side-delts": 68,
+      "front-delts": 58,
+      "quadriceps": 66,
+      "middle-back": 57,
       "rear-delts": 12,
       "forearms": 18,
-      "traps": 20,
+      "traps": 19,
       "calves": 45,
       "upper-chest": 18,
-      "other": 22,
+      "other": 33,
       "neck": 1
     }
   },
@@ -135,14 +135,12 @@
     {
       "id": "Arm_Slingers_Hanging_Bent_Knee_Legs",
       "name": "Arm Slingers Hanging Bent Knee Legs",
-      "bodyPart": "shoulders",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "front-delts",
-        "side-delts"
+        "abs"
       ],
       "primaryMuscles": [
-        "Front Delt",
-        "Side Delt"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -152,14 +150,12 @@
     {
       "id": "Arm_Slingers_Hanging_Straight_Legs",
       "name": "Arm Slingers Hanging Straight Legs",
-      "bodyPart": "shoulders",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "front-delts",
-        "side-delts"
+        "abs"
       ],
       "primaryMuscles": [
-        "Front Delt",
-        "Side Delt"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -214,12 +210,12 @@
     {
       "id": "Assisted_Hanging_Knee_Raise_With_Throw_Down",
       "name": "Assisted Hanging Knee Raise With Throw Down",
-      "bodyPart": "back",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "middle-back"
+        "abs"
       ],
       "primaryMuscles": [
-        "Middle Back"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -274,12 +270,12 @@
     {
       "id": "Assisted_Lying_Leg_Raise_With_Lateral_Throw_Down",
       "name": "Assisted Lying Leg Raise With Lateral Throw Down",
-      "bodyPart": "back",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "lats"
+        "abs"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -289,12 +285,12 @@
     {
       "id": "Assisted_Lying_Leg_Raise_With_Throw_Down",
       "name": "Assisted Lying Leg Raise With Throw Down",
-      "bodyPart": "back",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "middle-back"
+        "abs"
       ],
       "primaryMuscles": [
-        "Middle Back"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -1912,12 +1908,12 @@
     {
       "id": "Barbell_Lateral_Lunge",
       "name": "Barbell Lateral Lunge",
-      "bodyPart": "back",
+      "bodyPart": "legs",
       "muscleSlugs": [
-        "lats"
+        "quadriceps"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Quads"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -2062,12 +2058,12 @@
     {
       "id": "Barbell_Narrow_Stance_Squat",
       "name": "Barbell Narrow Stance Squat",
-      "bodyPart": "back",
+      "bodyPart": "legs",
       "muscleSlugs": [
-        "middle-back"
+        "quadriceps"
       ],
       "primaryMuscles": [
-        "Middle Back"
+        "Quads"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -2563,14 +2559,12 @@
     {
       "id": "Barbell_Seated_Bradford_Rocky_Press",
       "name": "Barbell Seated Bradford Rocky Press",
-      "bodyPart": "shoulders",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "front-delts",
-        "side-delts"
+        "other"
       ],
       "primaryMuscles": [
-        "Front Delt",
-        "Side Delt"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -3263,12 +3257,12 @@
     {
       "id": "Battling_Ropes",
       "name": "Battling Ropes",
-      "bodyPart": "cardio",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "cardio"
+        "other"
       ],
       "primaryMuscles": [
-        "Cardio"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -4484,12 +4478,12 @@
     {
       "id": "Cable_One_Arm_Lateral_Bent-Over",
       "name": "Cable One Arm Lateral Bent-Over",
-      "bodyPart": "back",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "lats"
+        "other"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -6523,12 +6517,12 @@
     {
       "id": "Dumbbell_Contralateral_Forward_Lunge",
       "name": "Dumbbell Contralateral Forward Lunge",
-      "bodyPart": "back",
+      "bodyPart": "legs",
       "muscleSlugs": [
-        "lats"
+        "quadriceps"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Quads"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -6868,12 +6862,12 @@
     {
       "id": "Dumbbell_Hammer_Curls_With_Arm_Blaster",
       "name": "Dumbbell Hammer Curls With Arm Blaster",
-      "bodyPart": "biceps",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "biceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Biceps"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -9203,14 +9197,12 @@
     {
       "id": "Elbow_Dips",
       "name": "Elbow Dips",
-      "bodyPart": "chest",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "chest",
-        "triceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Chest",
-        "Triceps"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -9959,14 +9951,12 @@
     {
       "id": "Impossible_Dips",
       "name": "Impossible Dips",
-      "bodyPart": "chest",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "chest",
-        "triceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Chest",
-        "Triceps"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -10402,14 +10392,12 @@
     {
       "id": "Korean_Dips",
       "name": "Korean Dips",
-      "bodyPart": "chest",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "chest",
-        "triceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Chest",
-        "Triceps"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -10434,12 +10422,12 @@
     {
       "id": "Leg_Pull_In_Flat_Bench",
       "name": "Leg Pull In Flat Bench",
-      "bodyPart": "back",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "lats"
+        "abs"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -10676,10 +10664,10 @@
       "name": "Lever One Arm Lateral High Row",
       "bodyPart": "back",
       "muscleSlugs": [
-        "lats"
+        "middle-back"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Middle Back"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11031,10 +11019,10 @@
       "name": "Lever Unilateral Row",
       "bodyPart": "back",
       "muscleSlugs": [
-        "lats"
+        "middle-back"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Middle Back"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11104,12 +11092,12 @@
     {
       "id": "Lying_Leg_Raise_Flat_Bench",
       "name": "Lying Leg Raise Flat Bench",
-      "bodyPart": "back",
+      "bodyPart": "core",
       "muscleSlugs": [
-        "lats"
+        "abs"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Abs"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11149,12 +11137,12 @@
     {
       "id": "Medicine_Ball_Catch_And_Overhead_Throw",
       "name": "Medicine Ball Catch And Overhead Throw",
-      "bodyPart": "back",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "middle-back"
+        "other"
       ],
       "primaryMuscles": [
-        "Middle Back"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11633,12 +11621,12 @@
     {
       "id": "Quads",
       "name": "Quads",
-      "bodyPart": "legs",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "quadriceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Quads"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11804,10 +11792,10 @@
       "name": "Reverse Hyper On Flat Bench",
       "bodyPart": "back",
       "muscleSlugs": [
-        "lats"
+        "lower-back"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Lower Back"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11832,14 +11820,12 @@
     {
       "id": "Ring_Dips",
       "name": "Ring Dips",
-      "bodyPart": "chest",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "chest",
-        "triceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Chest",
-        "Triceps"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -12048,14 +12034,12 @@
     {
       "id": "Scapula_Dips",
       "name": "Scapula Dips",
-      "bodyPart": "chest",
+      "bodyPart": "other",
       "muscleSlugs": [
-        "chest",
-        "triceps"
+        "other"
       ],
       "primaryMuscles": [
-        "Chest",
-        "Triceps"
+        "Other"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -12341,12 +12325,14 @@
     {
       "id": "Single_Leg_Platform_Slide",
       "name": "Single Leg Platform Slide",
-      "bodyPart": "back",
+      "bodyPart": "legs",
       "muscleSlugs": [
-        "lats"
+        "quadriceps",
+        "hamstrings"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Quads",
+        "Hamstrings"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -12923,10 +12909,10 @@
       "name": "Trap Bar Deadlift",
       "bodyPart": "back",
       "muscleSlugs": [
-        "traps"
+        "lower-back"
       ],
       "primaryMuscles": [
-        "Traps"
+        "Lower Back"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
