@@ -26,7 +26,14 @@ export async function getMuscleContributions(exercise) {
   const map = await loadMuscleMap();
   if (map[exercise.name]) return map[exercise.name];
 
-  // Fallback: map từ muscleGroup
+  // Fuzzy fallback
+  const nameLower = exercise.name.toLowerCase();
+  for (const [key, val] of Object.entries(map)) {
+    if (nameLower.includes(key.toLowerCase()) || key.toLowerCase().includes(nameLower)) {
+      return val;
+    }
+  }
+
   const g = exercise.muscleGroup || 'other';
   return { [g]: 1.0 };
 }
@@ -43,25 +50,13 @@ export const MUSCLE_GROUPS_DETAILED = [
 ];
 
 export const MUSCLE_GROUP_LABELS = {
-  neck: 'Neck',
-  traps: 'Traps',
-  front_delt: 'Front Delt',
-  side_delt: 'Side Delt',
-  rear_delt: 'Rear Delt',
-  upper_chest: 'Upper Chest',
-  chest: 'Chest',
-  lats: 'Lats',
-  middle_back: 'Middle Back',
-  lower_back: 'Lower Back',
-  biceps: 'Biceps',
-  triceps: 'Triceps',
-  forearms: 'Forearms',
-  abs: 'Abs',
-  obliques: 'Obliques',
-  glutes: 'Glutes',
-  quads: 'Quads',
-  hamstrings: 'Hamstrings',
-  calves: 'Calves',
+  neck: 'Neck', traps: 'Traps',
+  front_delt: 'Front Delt', side_delt: 'Side Delt', rear_delt: 'Rear Delt',
+  upper_chest: 'Upper Chest', chest: 'Chest',
+  lats: 'Lats', middle_back: 'Middle Back', lower_back: 'Lower Back',
+  biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms',
+  abs: 'Abs', obliques: 'Obliques',
+  glutes: 'Glutes', quads: 'Quads', hamstrings: 'Hamstrings', calves: 'Calves',
   cardio: 'Cardio',
 };
 
@@ -70,11 +65,12 @@ export function labelFor(mg) {
 }
 
 // ============================================================
-// HALF-LIFE MODEL
-// Đơn vị: giờ
+// HALF-LIFE MODEL — Scientific based
+// Large muscles need more recovery (48-72h)
+// Small muscles recover faster (24-36h)
 // ============================================================
 export const RECOVERY_HALF_LIFE = {
-  // Large muscles (48–72h)
+  // Large muscles (48-72h)
   chest: 60,
   upper_chest: 60,
   lats: 60,
@@ -85,14 +81,14 @@ export const RECOVERY_HALF_LIFE = {
   glutes: 60,
   traps: 48,
 
-  // Medium (36–48h)
+  // Medium (36-48h)
   front_delt: 42,
   side_delt: 40,
   rear_delt: 40,
   biceps: 40,
   triceps: 40,
 
-  // Small (24–36h)
+  // Small (24-36h)
   forearms: 30,
   calves: 36,
   abs: 30,
@@ -107,26 +103,22 @@ export function halfLifeFor(muscleGroup) {
   return RECOVERY_HALF_LIFE[muscleGroup] || 48;
 }
 
-// Alias để tương thích code cũ
 export const RECOVERY_HOURS = RECOVERY_HALF_LIFE;
 
 /**
- * Tính recovery percent dùng exponential decay.
- *
- * @param {number} hoursSince  Số giờ kể từ lần tập cuối
- * @param {number} halfLife    Half-life (giờ) của muscle
- * @returns {number}           0-100 (0=fatigued, 100=fresh)
+ * Exponential recovery model.
+ * recovery = 1 − exp(−hours_since / half_life)
+ * @returns {number} 0-100
  */
 export function recoveryPercent(hoursSince, halfLife) {
   if (hoursSince <= 0) return 0;
   if (!halfLife || halfLife <= 0) return 100;
-  // 1 - e^(-t/hl)
   const recovery = 1 - Math.exp(-hoursSince / halfLife);
-  return Math.round(recovery * 1000) / 10; // 1 decimal
+  return Math.round(recovery * 1000) / 10;
 }
 
 /**
- * Status label dựa vào recovery percent.
+ * Status label.
  */
 export function recoveryStatus(percent, neverTrained) {
   if (neverTrained) return { status: 'never', label: 'Never trained', color: '#5a6470' };

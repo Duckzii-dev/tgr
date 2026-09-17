@@ -57,20 +57,14 @@ export async function analyticsOverview(req, res) {
   const cutoff7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
   const cutoff30 = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
-  // ============================================================
-  // RECOVERY STATE — per muscle
-  // ============================================================
   const recovery = {};
   for (const mg of MUSCLE_GROUPS_DETAILED) {
     recovery[mg] = {
       muscleGroup: mg,
       lastTrainedAt: null,
-      lastFatigueDeposited: 0,    // fatigue units (weight×sets×reps)
-      sets7d: 0,
-      sets30d: 0,
-      volume7d: 0,
-      volume30d: 0,
-      // Sẽ tính sau
+      lastFatigueDeposited: 0,
+      sets7d: 0, sets30d: 0,
+      volume7d: 0, volume30d: 0,
       halfLife: halfLifeFor(mg),
       hoursSince: null,
       percent: 100,
@@ -123,19 +117,15 @@ export async function analyticsOverview(req, res) {
         weekBucket.sets += 1; weekBucket.reps += s.reps; weekBucket.volume += v;
         if (s.rir != null) { weekBucket.rirSum += s.rir; weekBucket.rirCount += 1; }
 
-        // === Compute recovery for each target muscle ===
-        // fatigue_deposit = weight × reps × muscle_weight
         for (const [mg, weight] of Object.entries(contrib)) {
           if (!(mg in recovery)) continue;
           const rec = recovery[mg];
 
-          // Track last trained
           if (!rec.lastTrainedAt || workoutDate > new Date(rec.lastTrainedAt)) {
             rec.lastTrainedAt = workoutDate.toISOString();
             rec.neverTrained = false;
           }
 
-          // Fatigue deposit (dùng weight × reps của set)
           const fatigue = s.weight * s.reps * weight;
           rec.lastFatigueDeposited += fatigue;
 
@@ -154,7 +144,6 @@ export async function analyticsOverview(req, res) {
     }
   }
 
-  // === Compute recovery percent (exponential) ===
   for (const mg of MUSCLE_GROUPS_DETAILED) {
     const rec = recovery[mg];
     const hl = rec.halfLife;
@@ -166,17 +155,10 @@ export async function analyticsOverview(req, res) {
       const hoursSince = (now - new Date(rec.lastTrainedAt)) / 3600000;
       rec.hoursSince = +hoursSince.toFixed(1);
       rec.percent = recoveryPercent(hoursSince, hl);
-      rec.hoursRemaining = Math.max(
-        0,
-        // t = -hl × ln(1 - 0.9) = hl × 2.3026  (để đạt 90%)
-        Math.round(hl * 2.3026 - hoursSince)
-      );
+      rec.hoursRemaining = Math.max(0, Math.round(hl * 2.3026 - hoursSince));
     }
 
-    // Status label
     rec.status = recoveryStatus(rec.percent, rec.neverTrained);
-
-    // Round
     rec.sets7d = +rec.sets7d.toFixed(1);
     rec.sets30d = +rec.sets30d.toFixed(1);
     rec.volume7d = Math.round(rec.volume7d);
@@ -221,7 +203,7 @@ export async function analyticsOverview(req, res) {
     trainingLoadByWeek,
     recovery: Object.values(recovery),
     recoveryModel: {
-      description: 'Exponential decay: recovery = 1 − exp(−hours / half_life)',
+      description: 'Exponential: recovery = 1 − exp(−hours / half_life)',
       halfLives: RECOVERY_HALF_LIFE,
     },
   });
