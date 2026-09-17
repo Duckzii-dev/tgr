@@ -4,6 +4,8 @@ import { api } from '../lib/api.js';
 import StatCard from '../components/StatCard.jsx';
 import LineChartCard from '../components/LineChartCard.jsx';
 import TrainingLoadCard from '../components/TrainingLoadCard.jsx';
+import MuscleRecoveryMap from '../components/MuscleRecoveryMap.jsx';
+import VolumeLandmarksCard from '../components/VolumeLandmarksCard.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import Empty from '../components/Empty.jsx';
 import { fmtDuration, fmtNumber } from '../lib/format.js';
@@ -21,6 +23,7 @@ export default function Analytics() {
     [from, to]
   );
   const streak = useFetch(() => api.get('/analytics/streak'), []);
+  const landmarks = useFetch(() => api.get('/landmarks'), []);
 
   const totalGymHours = ((data?.totalDuration || 0) / 3600).toFixed(1);
 
@@ -87,6 +90,21 @@ export default function Analytics() {
             sub={`Longest ${streak.data?.longest || 0}d`}
           />
         </div>
+      )}
+
+      {loading ? (
+        <Skeleton className="h-56" />
+      ) : (
+        <MuscleRecoveryMap recovery={data?.recovery || []} />
+      )}
+
+      {landmarks.loading ? (
+        <Skeleton className="h-56" />
+      ) : (
+        <VolumeLandmarksCard
+          landmarks={landmarks.data?.landmarks || []}
+          onRefresh={landmarks.refresh}
+        />
       )}
 
       {loading ? (
