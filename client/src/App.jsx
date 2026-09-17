@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
@@ -17,11 +17,9 @@ import PRs from './pages/PRs.jsx';
 import Goals from './pages/Goals.jsx';
 import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
-import ImportExercises from './pages/ImportExercises.jsx';
 import Admin from './pages/Admin.jsx';
 import AdminUserDetail from './pages/AdminUserDetail.jsx';
 import StrengthLevels from './pages/StrengthLevels.jsx';
-import AnatomeLibrary from './pages/AnatomeLibrary.jsx';
 
 const P = ({ children }) => (
   <ProtectedRoute>
@@ -41,7 +39,6 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/import-exercises" element={<P><ImportExercises /></P>} />
       <Route path="/" element={<P><Dashboard /></P>} />
       <Route path="/calendar" element={<P><CalendarPage /></P>} />
       <Route path="/workouts" element={<P><Workouts /></P>} />
@@ -56,7 +53,10 @@ export default function App() {
       <Route path="/profile" element={<P><Profile /></P>} />
       <Route path="/settings" element={<P><Settings /></P>} />
       <Route path="/strength" element={<P><StrengthLevels /></P>} />
-      <Route path="/library" element={<P><AnatomeLibrary /></P>} />
+
+      {/* Redirect các route cũ về /exercises */}
+      <Route path="/library" element={<Navigate to="/exercises" replace />} />
+      <Route path="/import-exercises" element={<Navigate to="/exercises" replace />} />
 
       <Route path="/admin" element={<A><Admin /></A>} />
       <Route path="/admin/users/:id" element={<A><AdminUserDetail /></A>} />

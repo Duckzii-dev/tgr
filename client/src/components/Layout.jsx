@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Dumbbell, Activity, LineChart, Trophy, Target,
-  User, Settings, LogOut, Menu, X, Library, Shield, Zap,
+  User, Settings, LogOut, Menu, X, Library, Shield, Zap, BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
@@ -12,7 +12,6 @@ const BASE_NAV = [
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },
   { to: '/exercises', label: 'Exercises', icon: Activity },
-  { to: '/library', label: 'Library', icon: Library },
   { to: '/strength', label: 'Strength', icon: Zap },
   { to: '/progress', label: 'Progress', icon: LineChart },
   { to: '/analytics', label: 'Analytics', icon: Activity },
@@ -26,7 +25,7 @@ const MOBILE = [
   { to: '/', label: 'Home', icon: LayoutDashboard },
   { to: '/calendar', label: 'Calendar', icon: Calendar },
   { to: '/workouts/new', label: 'Workout', icon: Dumbbell },
-  { to: '/strength', label: 'Strength', icon: Zap },
+  { to: '/exercises', label: 'Exercises', icon: Activity },
   { to: '/profile', label: 'Profile', icon: User },
 ];
 

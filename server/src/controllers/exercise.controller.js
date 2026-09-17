@@ -5,6 +5,10 @@ import {
   getMuscleContributions,
   labelFor,
 } from '../services/muscle.service.js';
+import {
+  searchUnifiedExercises,
+  getUnifiedExercise,
+} from '../services/unified-exercise.service.js';
 
 function computeBestForExercise(sessions) {
   const best = {
@@ -31,33 +35,60 @@ function computeBestForExercise(sessions) {
   return Object.values(best).filter(Boolean).sort((a, b) => new Date(b.achievedAt) - new Date(a.achievedAt));
 }
 
+/**
+ * GET /api/exercises
+ * Search hợp nhất: DB + Anatome JSON
+ */
 export async function listExercises(req, res) {
   const userId = req.user.id;
-  const { q, muscleGroup, limit, offset } = req.query;
-  const where = {
-    AND: [
-      { OR: [{ userId: null }, { userId }] },
-      q ? { name: { contains: q } } : {},
-      muscleGroup ? { muscleGroup } : {},
-    ],
-  };
-  const take = limit ? Math.min(200, Number(limit)) : 100;
-  const skip = offset ? Number(offset) : 0;
+  const { q, muscleGroup, equipment, difficulty, muscleSlug, source, limit, offset } = req.query;
 
-  const [exercises, total] = await Promise.all([
-    prisma.exercise.findMany({
-      where,
-      orderBy: [{ muscleGroup: 'asc' }, { name: 'asc' }],
-      take, skip,
-      select: {
-        id: true, name: true, muscleGroup: true, equipment: true,
-        isCustom: true, videoUrl: true, imageUrl: true,
-      },
-    }),
-    prisma.exercise.count({ where }),
-  ]);
+  const result = await searchUnifiedExercises(userId, {
+    q: q || null,
+    muscleGroup: muscleGroup || null,
+    equipment: equipment || null,
+    difficulty: difficulty || null,
+    muscleSlug: muscleSlug || null,
+    source: source || null,
+    limit: limit ? Math.min(200, Number(limit)) : 50,
+    offset: offset ? Number(offset) : 0,
+  });
 
-  res.json({ exercises, total });
+  res.json(result);
+}
+
+/**
+ * GET /api/exercises/facets
+ * List facets từ hợp nhất 2 nguồn
+ */
+export async function facets(req, res) {
+  const userId = req.user.id;
+
+  const dbExercises = await prisma.exercise.findMany({
+    where: { OR: [{ userId: null }, { userId }] },
+    select: { muscleGroup: true, equipment: true },
+  });
+
+  const muscleGroups = new Set();
+  const equipments = new Set();
+  for (const e of dbExercises) {
+    if (e.muscleGroup) muscleGroups.add(e.muscleGroup);
+    if (e.equipment) equipments.add(e.equipment);
+  }
+
+  // Facets từ Anatome
+  const { loadAnatomeExercises } = await import('../services/anatome.service.js');
+  const { exercises: anatomeExercises } = await loadAnatomeExercises();
+  const muscleSlugs = new Set();
+  for (const ex of anatomeExercises) {
+    for (const m of ex.muscleSlugs || []) muscleSlugs.add(m);
+  }
+
+  res.json({
+    muscleGroups: [...muscleGroups].sort(),
+    equipments: [...equipments].sort(),
+    muscleSlugs: [...muscleSlugs].sort(),
+  });
 }
 
 export async function createExercise(req, res) {
@@ -74,9 +105,17 @@ export async function createExercise(req, res) {
 }
 
 export async function getExercise(req, res) {
-  const { id } = req.params;
   const userId = req.user.id;
+  const { id } = req.params;
 
+  // Anatome exercise
+  if (id.startsWith('anatome:')) {
+    const ex = await getUnifiedExercise(userId, id);
+    if (!ex) throw httpError(404, 'Exercise not found');
+    return res.json({ exercise: ex, stats: null, prs: [], sessions: [] });
+  }
+
+  // DB exercise
   const exercise = await prisma.exercise.findFirst({
     where: { id, OR: [{ userId: null }, { userId }] },
   });
@@ -155,17 +194,9 @@ export async function getExercise(req, res) {
       isCustom: exercise.isCustom,
       videoUrl: exercise.videoUrl,
       imageUrl: exercise.imageUrl,
-      imageUrls: exercise.imageUrls,
-      bodyParts: exercise.bodyParts,
-      targetMuscles: exercise.targetMuscles,
-      secondaryMuscles: exercise.secondaryMuscles,
-      equipments: exercise.equipments,
-      exerciseType: exercise.exerciseType,
       overview: exercise.overview,
       instructions: exercise.instructions,
-      exerciseTips: exercise.exerciseTips,
-      variations: exercise.variations,
-      keywords: exercise.keywords,
+      source: 'db',
     },
     muscleContributions,
     stats: {
