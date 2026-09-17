@@ -149,17 +149,30 @@ export async function getExercise(req, res) {
     (a, b) => new Date(a.date) - new Date(b.date)
   );
 
-  let totalSets = 0,
-    totalReps = 0,
-    totalVolume = 0,
-    maxWeight = 0,
-    best1RM = 0,
-    best5 = 0,
-    best10 = 0,
-    startingWeight = null,
-    currentBest = 0;
+  let totalSets = 0;
+  let totalReps = 0;
+  let totalVolume = 0;
+  let maxWeight = 0;
+  let best1RM = 0;
+  let best5 = 0;
+  let best10 = 0;
+  let startingWeight = null;
+  let currentBest = 0;
+
+  // RIR/RPE tracking
+  let rirSum = 0;
+  let rirCount = 0;
+  let rpeSum = 0;
+  let rpeCount = 0;
+  const rirDistribution = {}; // { '0': 3, '1': 5, '2': 8, ... }
+  const rpeProgression = []; // [{ date, avgRpe, avgRir }, ...]
 
   for (const sess of sessionList) {
+    let sessionRirSum = 0;
+    let sessionRirCount = 0;
+    let sessionRpeSum = 0;
+    let sessionRpeCount = 0;
+
     for (const s of sess.sets) {
       totalSets++;
       totalReps += s.reps;
@@ -169,9 +182,31 @@ export async function getExercise(req, res) {
       if (s.estimated1RM && s.estimated1RM > best1RM) best1RM = s.estimated1RM;
       if (s.reps >= 5 && s.weight > best5) best5 = s.weight;
       if (s.reps >= 10 && s.weight > best10) best10 = s.weight;
+
+      if (s.rir != null) {
+        rirSum += s.rir;
+        rirCount++;
+        sessionRirSum += s.rir;
+        sessionRirCount++;
+        const key = String(s.rir);
+        rirDistribution[key] = (rirDistribution[key] || 0) + 1;
+      }
+      if (s.rpe != null) {
+        rpeSum += s.rpe;
+        rpeCount++;
+        sessionRpeSum += s.rpe;
+        sessionRpeCount++;
+      }
     }
     if (sess.sets.length) {
       currentBest = Math.max(currentBest, ...sess.sets.map((s) => s.weight));
+    }
+    if (sessionRirCount > 0 || sessionRpeCount > 0) {
+      rpeProgression.push({
+        date: new Date(sess.date).toISOString().slice(0, 10),
+        avgRir: sessionRirCount ? +(sessionRirSum / sessionRirCount).toFixed(2) : null,
+        avgRpe: sessionRpeCount ? +(sessionRpeSum / sessionRpeCount).toFixed(2) : null,
+      });
     }
   }
 
@@ -209,6 +244,10 @@ export async function getExercise(req, res) {
       best10,
       startingWeight: startingWeight ?? 0,
       currentBest,
+      avgRir: rirCount ? +(rirSum / rirCount).toFixed(2) : null,
+      avgRpe: rpeCount ? +(rpeSum / rpeCount).toFixed(2) : null,
+      rirDistribution,
+      rpeProgression,
     },
     prs,
     sessions: sessionList,

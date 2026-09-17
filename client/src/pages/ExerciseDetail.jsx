@@ -8,7 +8,7 @@ import StatCard from '../components/StatCard.jsx';
 import LineChartCard from '../components/LineChartCard.jsx';
 import { fmtDate, fmtNumber } from '../lib/format.js';
 
-const TABS = ['Overview', 'History', 'Progression', 'PRs'];
+const TABS = ['Overview', 'History', 'Progression', 'Intensity', 'PRs'];
 const RANGES = { '30D': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 99999 };
 
 export default function ExerciseDetail() {
@@ -216,6 +216,7 @@ export default function ExerciseDetail() {
                     <div key={set.id}>
                       {i + 1}. {set.weight}kg × {set.reps}
                       {set.rir != null ? ` (RIR ${set.rir})` : ''}
+                      {set.rpe != null ? ` (RPE ${set.rpe})` : ''}
                       {set.estimated1RM
                         ? ` · ${set.estimated1RM.toFixed(1)} 1RM`
                         : ''}
@@ -237,6 +238,73 @@ export default function ExerciseDetail() {
             lines={[{ key: 'maxWeight', name: 'kg' }]}
             height={320}
           />
+        </div>
+      )}
+
+      {tab === 'Intensity' && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              label="Avg RIR"
+              value={stats.avgRir != null ? stats.avgRir.toFixed(2) : '—'}
+              sub="Lower = closer to failure"
+            />
+            <StatCard
+              label="Avg RPE"
+              value={stats.avgRpe != null ? stats.avgRpe.toFixed(2) : '—'}
+              sub="10 = max effort"
+            />
+          </div>
+
+          {stats.rpeProgression?.length > 0 ? (
+            <div className="card p-4">
+              <div className="text-sm mb-2 text-ink-300">RIR / RPE over time</div>
+              <LineChartCard
+                data={stats.rpeProgression}
+                xKey="date"
+                lines={[
+                  { key: 'avgRir', name: 'RIR', color: '#c6ff3d' },
+                  { key: 'avgRpe', name: 'RPE', color: '#5ed3ff' },
+                ]}
+                height={320}
+              />
+            </div>
+          ) : (
+            <Empty
+              title="No RIR/RPE data"
+              hint="Log RIR or RPE in sets to see trend."
+            />
+          )}
+
+          {Object.keys(stats.rirDistribution || {}).length > 0 && (
+            <div className="card p-4">
+              <div className="font-semibold mb-3">RIR Distribution</div>
+              <div className="space-y-2">
+                {Object.entries(stats.rirDistribution)
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([rir, count]) => {
+                    const max = Math.max(...Object.values(stats.rirDistribution));
+                    return (
+                      <div key={rir}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span>
+                            RIR {rir}
+                            {rir === '0' && ' (failure)'}
+                          </span>
+                          <span className="text-ink-400">{count} sets</span>
+                        </div>
+                        <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-accent rounded-full"
+                            style={{ width: `${(count / max) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

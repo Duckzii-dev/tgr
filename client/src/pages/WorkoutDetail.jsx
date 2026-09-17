@@ -315,6 +315,7 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [rir, setRir] = useState('');
+  const [rpe, setRpe] = useState('');
   const [prevSets, setPrevSets] = useState(null);
 
   useEffect(() => {
@@ -333,11 +334,13 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
       weight: Number(weight),
       reps: Number(reps),
       rir: rir ? Number(rir) : null,
+      rpe: rpe ? Number(rpe) : null,
       restSeconds: 90,
     });
     setWeight('');
     setReps('');
     setRir('');
+    setRpe('');
   };
 
   return (
@@ -391,7 +394,7 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
             onChange={(e) => setWeight(e.target.value)}
           />
         </div>
-        <div className="col-span-3">
+        <div className="col-span-2">
           <label className="label">Reps</label>
           <input
             className="input"
@@ -405,11 +408,27 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
           <input
             className="input"
             type="number"
+            min="0"
+            max="10"
+            placeholder="—"
             value={rir}
             onChange={(e) => setRir(e.target.value)}
           />
         </div>
-        <button className="btn btn-primary col-span-4 justify-center">
+        <div className="col-span-2">
+          <label className="label">RPE</label>
+          <input
+            className="input"
+            type="number"
+            min="1"
+            max="10"
+            step="0.5"
+            placeholder="—"
+            value={rpe}
+            onChange={(e) => setRpe(e.target.value)}
+          />
+        </div>
+        <button className="btn btn-primary col-span-3 justify-center">
           <Plus className="w-4 h-4" /> Add Set
         </button>
       </form>
@@ -420,31 +439,66 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
 function SetRow({ s, index, onUpdate, onDelete }) {
   const [weight, setWeight] = useState(s.weight);
   const [reps, setReps] = useState(s.reps);
+  const [rir, setRir] = useState(s.rir ?? '');
+  const [rpe, setRpe] = useState(s.rpe ?? '');
+
   const commit = () => {
-    if (weight !== s.weight || reps !== s.reps)
-      onUpdate(s.id, { weight: Number(weight), reps: Number(reps) });
+    const patch = {};
+    if (Number(weight) !== s.weight) patch.weight = Number(weight);
+    if (Number(reps) !== s.reps) patch.reps = Number(reps);
+    if ((rir === '' ? null : Number(rir)) !== s.rir)
+      patch.rir = rir === '' ? null : Number(rir);
+    if ((rpe === '' ? null : Number(rpe)) !== s.rpe)
+      patch.rpe = rpe === '' ? null : Number(rpe);
+    if (Object.keys(patch).length) onUpdate(s.id, patch);
   };
+
   return (
     <div className="grid grid-cols-12 gap-2 items-center bg-ink-850 rounded-lg px-2 py-1.5">
       <div className="col-span-1 text-xs text-ink-400">#{index}</div>
       <input
-        className="input col-span-3 py-1"
+        className="input col-span-2 py-1"
         type="number"
         step="0.5"
         value={weight}
         onChange={(e) => setWeight(e.target.value)}
         onBlur={commit}
+        title="Weight (kg)"
       />
       <div className="col-span-1 text-center text-ink-400 text-xs">×</div>
       <input
-        className="input col-span-3 py-1"
+        className="input col-span-2 py-1"
         type="number"
         value={reps}
         onChange={(e) => setReps(e.target.value)}
         onBlur={commit}
+        title="Reps"
       />
-      <div className="col-span-2 text-xs text-ink-400 text-center">
-        {s.estimated1RM ? `${s.estimated1RM.toFixed(1)} 1RM` : '—'}
+      <input
+        className="input col-span-2 py-1"
+        type="number"
+        min="0"
+        max="10"
+        placeholder="RIR"
+        value={rir}
+        onChange={(e) => setRir(e.target.value)}
+        onBlur={commit}
+        title="Reps in Reserve (0 = failure)"
+      />
+      <input
+        className="input col-span-2 py-1"
+        type="number"
+        min="1"
+        max="10"
+        step="0.5"
+        placeholder="RPE"
+        value={rpe}
+        onChange={(e) => setRpe(e.target.value)}
+        onBlur={commit}
+        title="Rate of Perceived Exertion (10 = max)"
+      />
+      <div className="col-span-1 text-xs text-ink-400 text-center">
+        {s.estimated1RM ? `${s.estimated1RM.toFixed(1)}` : '—'}
       </div>
       <div className="col-span-1 text-right">
         <button onClick={onDelete} className="text-ink-400 hover:text-red-400">
