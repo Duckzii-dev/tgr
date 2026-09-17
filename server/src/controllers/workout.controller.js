@@ -91,7 +91,6 @@ export async function createWorkout(req, res) {
   let startTime = null;
   let endTime = null;
   if (dur && dur > 0) {
-    // Backfill: gán endTime 20:00 local của ngày, startTime = end - duration
     const end = new Date(baseDate);
     end.setHours(20, 0, 0, 0);
     endTime = end;
@@ -171,7 +170,6 @@ export async function finishWorkout(req, res) {
   });
   if (!workout) throw httpError(404, 'Workout not found');
 
-  // Idempotent: nếu đã finish → trả summary hiện tại, không ghi lại PR
   if (workout.finishedAt) {
     const summary = await buildSummary(id);
     return res.json({ workout, summary, alreadyFinished: true });
@@ -196,9 +194,9 @@ export async function finishWorkout(req, res) {
     },
   });
 
-  // Evaluate + persist PRs (loại trừ chính workout này khỏi prior)
   for (const we of workout.exercises) {
     for (const s of we.sets) {
+      if (s.isWarmup) continue;
       const candidates = await evaluatePRs({
         userId,
         exerciseId: we.exerciseId,
@@ -234,6 +232,7 @@ async function buildSummary(workoutId) {
   let totalVolume = 0;
   for (const we of full.exercises) {
     for (const s of we.sets) {
+      if (s.isWarmup) continue;
       totalSets++;
       totalReps += s.reps;
       totalVolume += volume(s.weight, s.reps);
@@ -391,8 +390,8 @@ export async function updateSet(req, res) {
     data: {
       weight: w,
       reps: r,
-      rir: rir != null ? Number(rir) : ex.rir,
-      rpe: rpe != null ? Number(rpe) : ex.rpe,
+      rir: rir !== undefined ? (rir === null ? null : Number(rir)) : ex.rir,
+      rpe: rpe !== undefined ? (rpe === null ? null : Number(rpe)) : ex.rpe,
       restSeconds: restSeconds != null ? Number(restSeconds) : ex.restSeconds,
       isWarmup: isWarmup != null ? !!isWarmup : ex.isWarmup,
       estimated1RM: epley1RM(w, r),
@@ -439,6 +438,7 @@ export async function duplicatePrevious(req, res) {
     rpe: s.rpe,
     restSeconds: s.restSeconds,
     estimated1RM: s.estimated1RM,
+    isWarmup: s.isWarmup,
   }));
   await prisma.workoutSet.createMany({ data });
   res.json({ created: data.length });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Copy, Timer, Check, Search } from 'lucide-react';
+import { Plus, Trash2, Copy, Timer, Check, Search, Flame } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
@@ -8,6 +8,7 @@ import Skeleton from '../components/Skeleton.jsx';
 import Modal from '../components/Modal.jsx';
 import Confirm from '../components/Confirm.jsx';
 import RestTimer from '../components/RestTimer.jsx';
+import WarmupModal from '../components/WarmupModal.jsx';
 import Empty from '../components/Empty.jsx';
 import { startRestTimer } from '../components/RestTimerHost.jsx';
 import { getRestTimerSettings } from '../lib/restTimerSettings.js';
@@ -28,6 +29,7 @@ export default function WorkoutDetail() {
   const [deleteEx, setDeleteEx] = useState(null);
   const [summary, setSummary] = useState(null);
   const [finishing, setFinishing] = useState(false);
+  const [warmupFor, setWarmupFor] = useState(null);
 
   const openAdd = () => {
     setAddOpen(true);
@@ -68,7 +70,7 @@ export default function WorkoutDetail() {
       refresh();
 
       const settings = getRestTimerSettings();
-      if (settings.autoStart) {
+      if (settings.autoStart && !payload?.isWarmup) {
         const duration = payload?.restSeconds || settings.defaultDuration || 90;
         startRestTimer({
           duration,
@@ -81,6 +83,21 @@ export default function WorkoutDetail() {
             : null,
         });
       }
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+
+  const addManySets = async (weId, sets) => {
+    try {
+      for (const s of sets) {
+        await api.post(`/workouts/exercises/${weId}/sets`, {
+          ...s,
+          isWarmup: true,
+        });
+      }
+      refresh();
+      toast(`Added ${sets.length} warm-up sets`);
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -141,10 +158,18 @@ export default function WorkoutDetail() {
   const isFinished = !!w.finishedAt;
 
   const totalVolume = w.exercises.reduce(
-    (s, we) => s + we.sets.reduce((a, x) => a + x.weight * x.reps, 0),
+    (s, we) =>
+      s +
+      we.sets.reduce(
+        (a, x) => a + (x.isWarmup ? 0 : x.weight * x.reps),
+        0
+      ),
     0
   );
-  const totalSets = w.exercises.reduce((s, we) => s + we.sets.length, 0);
+  const totalSets = w.exercises.reduce(
+    (s, we) => s + we.sets.filter((x) => !x.isWarmup).length,
+    0
+  );
 
   return (
     <div className="space-y-4">
@@ -203,6 +228,9 @@ export default function WorkoutDetail() {
           key={we.id}
           we={we}
           onAdd={(weId, payload) => addSet(weId, payload, we)}
+          onWarmup={(workingWeight) =>
+            setWarmupFor({ weId: we.id, workingWeight })
+          }
           onUpdate={updateSet}
           onDelete={(sid) => setDeleteSet(sid)}
           onDup={() => dupPrev(we.id)}
@@ -308,6 +336,13 @@ export default function WorkoutDetail() {
         )}
       </Modal>
 
+      <WarmupModal
+        open={!!warmupFor}
+        onClose={() => setWarmupFor(null)}
+        defaultWorkingWeight={warmupFor?.workingWeight || 0}
+        onApply={(sets) => addManySets(warmupFor.weId, sets)}
+      />
+
       <Confirm
         open={!!deleteSet}
         onClose={() => setDeleteSet(null)}
@@ -334,7 +369,7 @@ function Row({ label, value }) {
   );
 }
 
-function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
+function ExerciseBlock({ we, onAdd, onWarmup, onUpdate, onDelete, onDup, onRemove }) {
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [rir, setRir] = useState('');
@@ -366,6 +401,9 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
     setRpe('');
   };
 
+  const warmupSets = we.sets.filter((s) => s.isWarmup);
+  const workingSets = we.sets.filter((s) => !s.isWarmup);
+
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between mb-3">
@@ -383,6 +421,13 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
         <div className="flex gap-1">
           <button
             className="btn btn-ghost text-xs"
+            onClick={() => onWarmup(Number(weight) || 0)}
+            title="Generate warm-up sets"
+          >
+            <Flame className="w-3 h-3" /> Warm-up
+          </button>
+          <button
+            className="btn btn-ghost text-xs"
             onClick={onDup}
             title="Duplicate previous session"
           >
@@ -394,8 +439,40 @@ function ExerciseBlock({ we, onAdd, onUpdate, onDelete, onDup, onRemove }) {
         </div>
       </div>
 
+      {warmupSets.length > 0 && (
+        <div className="mb-3 space-y-1 opacity-70">
+          <div className="text-[10px] uppercase tracking-wide text-ink-500">
+            Warm-up
+          </div>
+          {warmupSets.map((s, i) => (
+            <div
+              key={s.id}
+              className="grid grid-cols-12 gap-2 items-center bg-ink-900/60 rounded-lg px-2 py-1.5"
+            >
+              <div className="col-span-1 text-xs text-ink-500">W{i + 1}</div>
+              <div className="col-span-2 text-sm text-ink-300">
+                {s.weight}kg
+              </div>
+              <div className="col-span-1 text-center text-ink-500 text-xs">×</div>
+              <div className="col-span-2 text-sm text-ink-300">{s.reps}</div>
+              <div className="col-span-4 text-xs text-ink-500 text-center">
+                {s.restSeconds ? `rest ${s.restSeconds}s` : '—'}
+              </div>
+              <div className="col-span-2 text-right">
+                <button
+                  onClick={() => onDelete(s.id)}
+                  className="text-ink-500 hover:text-red-400"
+                >
+                  <Trash2 className="w-3 h-3 inline" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-1 mb-3">
-        {we.sets.map((s, i) => (
+        {workingSets.map((s, i) => (
           <SetRow
             key={s.id}
             s={s}

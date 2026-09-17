@@ -1,10 +1,6 @@
 import { prisma } from '../utils/prisma.js';
 import { epley1RM, volume } from '../utils/calc.js';
 
-/**
- * Đánh giá PR cho một set so với lịch sử TRƯỚC ĐÓ (loại trừ chính workout đang xét).
- * Trả về mảng candidate PR (chưa persist).
- */
 export async function evaluatePRs({
   userId,
   exerciseId,
@@ -29,6 +25,7 @@ export async function evaluatePRs({
 
   const priorSets = await prisma.workoutSet.findMany({
     where: {
+      isWarmup: false,
       workoutExercise: {
         exerciseId,
         workout: {
@@ -70,10 +67,6 @@ export async function evaluatePRs({
   return newPRs;
 }
 
-/**
- * Persist PR vào bảng PersonalRecord — upsert theo (userId, exerciseId, type).
- * Mỗi exercise+type chỉ giữ 1 PR tốt nhất.
- */
 export async function persistPRs({ userId, exerciseId, workoutId, prs }) {
   if (!prs.length) return [];
   const created = [];
@@ -109,23 +102,15 @@ export async function persistPRs({ userId, exerciseId, workoutId, prs }) {
   return created;
 }
 
-/**
- * Xoá toàn bộ PR gắn với một workout (dùng khi delete/bulk-delete).
- * Sau khi xoá nên gọi rebuildAllPRs để tính lại từ lịch sử còn lại.
- */
 export async function clearPRsForWorkout(workoutId) {
   await prisma.personalRecord.deleteMany({ where: { workoutId } });
 }
 
-/**
- * Recompute lại toàn bộ PR cho một user (dùng khi bulk-delete workout).
- * Xoá sạch rồi build lại từ WorkoutSet theo thứ tự thời gian.
- */
 export async function rebuildAllPRs(userId) {
   await prisma.personalRecord.deleteMany({ where: { userId } });
 
   const sets = await prisma.workoutSet.findMany({
-    where: { workoutExercise: { workout: { userId } } },
+    where: { isWarmup: false, workoutExercise: { workout: { userId } } },
     include: {
       workoutExercise: {
         include: {
