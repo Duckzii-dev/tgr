@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, X, Play, Activity } from 'lucide-react';
+import { Search, Filter, X, Play, Activity, BookOpen } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import Skeleton from '../components/Skeleton.jsx';
@@ -7,18 +7,12 @@ import Empty from '../components/Empty.jsx';
 import Modal from '../components/Modal.jsx';
 import { fmtNumber } from '../lib/format.js';
 
-const API_ANATOME = 'https://api.anatome.dev';
+function slugifyId(id) {
+  return String(id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
-function buildAnatomeUrl(ex) {
-  if (!ex?.layersPayload?.length) return null;
-  const layers = ex.layersPayload
-    .map((l) => {
-      const color = (l.color || '#DC2626').replace('#', '');
-      const muscles = (l.muscles || []).join('%2C');
-      return `${color}:${muscles}`;
-    })
-    .join(',');
-  return `${API_ANATOME}/generateImage?gender=male&view=dual&layers=${layers}&output=raw`;
+function getLocalMapUrl(exId) {
+  return `/static/muscle-maps/${slugifyId(exId)}.svg`;
 }
 
 export default function AnatomeLibrary() {
@@ -63,11 +57,14 @@ export default function AnatomeLibrary() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Exercise Library</h1>
-        <p className="text-sm text-ink-400 mt-1">
-          {fmtNumber(meta.data?.total) || '...'} bài tập từ Anatome DB · Apache-2.0
-        </p>
+      <div className="flex items-center gap-3">
+        <BookOpen className="w-6 h-6 text-accent" />
+        <div>
+          <h1 className="text-2xl font-semibold">Exercise Library</h1>
+          <p className="text-sm text-ink-400 mt-0.5">
+            {fmtNumber(meta.data?.total) || '...'} bài tập · Muscle maps local
+          </p>
+        </div>
       </div>
 
       <div className="card p-4 space-y-3">
@@ -86,6 +83,11 @@ export default function AnatomeLibrary() {
             onClick={() => setShowFilters((v) => !v)}
           >
             <Filter className="w-4 h-4" /> Filters
+            {hasFilters && (
+              <span className="ml-1 px-1.5 rounded-full bg-accent text-ink-950 text-[10px] font-bold">
+                {[bodyPart, equipment, difficulty, muscleSlug, category].filter(Boolean).length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -164,9 +166,9 @@ export default function AnatomeLibrary() {
               <button
                 key={ex.id}
                 onClick={() => setDetail(ex)}
-                className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors"
+                className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors group"
               >
-                <div className="font-medium text-sm line-clamp-2 min-h-[2.4em]">
+                <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
                   {ex.name}
                 </div>
 
@@ -182,7 +184,7 @@ export default function AnatomeLibrary() {
                     <span className="chip text-[10px]">{ex.equipment}</span>
                   )}
                   {ex.difficulty && (
-                    <span className="chip text-[10px]">{ex.difficulty}</span>
+                    <span className="chip text-[10px] capitalize">{ex.difficulty}</span>
                   )}
                   {ex.mechanic && (
                     <span className="chip text-[10px]">{ex.mechanic}</span>
@@ -199,7 +201,11 @@ export default function AnatomeLibrary() {
           </div>
         </>
       ) : (
-        <Empty title="Không tìm thấy bài tập" hint="Thử đổi từ khoá hoặc filter." />
+        <Empty
+          title="Không tìm thấy bài tập"
+          hint="Thử đổi từ khoá hoặc filter."
+          icon={Search}
+        />
       )}
 
       <Modal
@@ -215,25 +221,25 @@ export default function AnatomeLibrary() {
 }
 
 function ExerciseDetailContent({ ex }) {
-  const anatomeUrl = buildAnatomeUrl(ex);
   const [showMap, setShowMap] = useState(false);
   const [mapError, setMapError] = useState(false);
+  const mapUrl = getLocalMapUrl(ex.id);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {ex.equipment && <span className="chip">{ex.equipment}</span>}
-        {ex.difficulty && <span className="chip">{ex.difficulty}</span>}
-        {ex.category && <span className="chip">{ex.category}</span>}
-        {ex.mechanic && <span className="chip">{ex.mechanic}</span>}
-        {ex.force && <span className="chip">{ex.force}</span>}
+        {ex.difficulty && <span className="chip capitalize">{ex.difficulty}</span>}
+        {ex.category && <span className="chip capitalize">{ex.category}</span>}
+        {ex.mechanic && <span className="chip capitalize">{ex.mechanic}</span>}
+        {ex.force && <span className="chip capitalize">{ex.force}</span>}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         {ex.primaryMuscles?.length > 0 && (
           <div>
             <div className="label">Primary Muscles</div>
-            <div className="text-sm text-accent">
+            <div className="text-sm text-accent font-medium">
               {ex.primaryMuscles.join(', ')}
             </div>
           </div>
@@ -248,35 +254,34 @@ function ExerciseDetailContent({ ex }) {
         )}
       </div>
 
-      {anatomeUrl && (
-        <div>
-          <button
-            className="btn btn-ghost w-full justify-center"
-            onClick={() => setShowMap((v) => !v)}
-          >
-            <Activity className="w-4 h-4" />
-            {showMap ? 'Hide' : 'Show'} Muscle Map
-          </button>
-          {showMap && (
-            <div className="mt-3 flex justify-center bg-ink-950 rounded-xl p-4 min-h-[420px]">
-              {mapError ? (
-                <div className="text-xs text-red-400 self-center">
-                  Muscle map unavailable (Anatome API offline)
-                </div>
-              ) : (
-                <img
-                  src={anatomeUrl}
-                  alt="Muscle map"
-                  width={280}
-                  height={420}
-                  className="max-w-full"
-                  onError={() => setMapError(true)}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <div>
+        <button
+          className="btn btn-ghost w-full justify-center"
+          onClick={() => setShowMap((v) => !v)}
+        >
+          <Activity className="w-4 h-4" />
+          {showMap ? 'Hide' : 'Show'} Muscle Map
+        </button>
+        {showMap && (
+          <div className="mt-3 flex justify-center bg-ink-950 rounded-xl p-4 min-h-[420px]">
+            {mapError ? (
+              <div className="text-xs text-ink-500 self-center text-center px-4">
+                Muscle map chưa có cho bài tập này.
+              </div>
+            ) : (
+              <img
+                src={mapUrl}
+                alt={`Muscle map for ${ex.name}`}
+                width={280}
+                height={420}
+                className="max-w-full"
+                onError={() => setMapError(true)}
+                loading="lazy"
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       {ex.videoUrl && (
         <div>
