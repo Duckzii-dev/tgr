@@ -1,7 +1,7 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { fmtNumber } from '../lib/format.js';
 import { Info, X } from 'lucide-react';
-import { BODY_PATHS, getPathsForMuscle, getMusclesForView, VIEWBOX } from '../lib/bodyPaths.js';
+import BodyMusclesChart from './BodyMusclesChart.jsx';
 
 const LABELS = {
   neck: 'Neck', traps: 'Traps',
@@ -23,15 +23,6 @@ function recoverySolid(percent, never) {
   return '#8a1f1f';
 }
 
-function recoveryGradId(percent, never) {
-  if (never) return 'gradNever';
-  if (percent >= 90) return 'gradReady';
-  if (percent >= 70) return 'gradAlmost';
-  if (percent >= 40) return 'gradMid';
-  if (percent >= 15) return 'gradFatigued';
-  return 'gradDead';
-}
-
 function fmtHours(h) {
   if (h == null) return '—';
   if (h < 1) return `${Math.round(h * 60)}m`;
@@ -42,9 +33,7 @@ function fmtHours(h) {
 export default function MuscleRecoveryMap({ recovery = [] }) {
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [view, setView] = useState('front');
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const containerRef = useRef(null);
+  const [view, setView] = useState('FRONT');
 
   const byGroup = {};
   for (const r of recovery) byGroup[r.muscleGroup] = r;
@@ -59,34 +48,6 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
   const active = hovered || selected;
   const activeData = active ? get(active) : null;
   const activeNever = activeData?.neverTrained;
-
-  const fillFor = (g) => {
-    const r = get(g);
-    const isActive = active === g;
-    const dim = active && !isActive;
-    return {
-      fill: `url(#${recoveryGradId(r.percent, r.neverTrained)})`,
-      opacity: dim ? 0.35 : 1,
-      filter: isActive ? 'url(#glowActive)' : undefined,
-    };
-  };
-
-  const handlers = (g) => ({
-    onMouseEnter: () => setHovered(g),
-    onMouseLeave: () => setHovered(null),
-    onClick: () => setSelected((s) => (s === g ? null : g)),
-    style: {
-      cursor: 'pointer',
-      transition: 'opacity 220ms ease, filter 220ms ease',
-      ...fillFor(g),
-    },
-  });
-
-  const labelText = (g) => {
-    const r = get(g);
-    if (r.neverTrained) return '';
-    return `${Math.round(r.percent)}`;
-  };
 
   const groupsByStatus = useMemo(() => {
     const groups = recovery.filter((r) => r.muscleGroup !== 'cardio');
@@ -110,49 +71,8 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
     return all.sort((a, b) => (a.hoursRemaining || 99) - (b.hoursRemaining || 99))[0];
   }, [groupsByStatus]);
 
-  const renderMuscle = (slug) => {
-    const paths = getPathsForMuscle(slug, view);
-    if (!paths.length) return null;
-
-    const label = labelText(slug);
-    const isActive = active === slug;
-
-    return (
-      <g key={slug} className="muscle-group">
-        {paths.map(({ key, d }) => (
-          <path
-            key={key}
-            d={d}
-            stroke={isActive ? '#c6ff3d' : '#1a1f28'}
-            strokeWidth={isActive ? 1.5 : 0.8}
-            {...handlers(slug)}
-          />
-        ))}
-        {label && (
-          <text
-            x={slug.includes('_l') ? 82 : slug.includes('_r') ? 138 : 110}
-            y={{
-              chest: 122, abs: 170, quads: 360, hamstrings: 360,
-              glutes: 250, biceps: 145, triceps: 145, calves: 440,
-              traps: 88, middle_back: 130, lower_back: 190, lats: 135,
-            }[slug] || 100}
-            textAnchor="middle"
-            fontSize="9"
-            fontWeight="700"
-            fill={isActive ? '#c6ff3d' : '#0b0c0e'}
-            pointerEvents="none"
-          >
-            {label}
-          </text>
-        )}
-      </g>
-    );
-  };
-
-  const musclesInView = getMusclesForView(view);
-
   return (
-    <div className="card p-4 sm:p-6 space-y-5" ref={containerRef}>
+    <div className="card p-4 sm:p-6 space-y-5 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -182,12 +102,12 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
         </div>
       </div>
 
-      {/* 3-column layout: body | detail | pills */}
-      <div className="grid lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
-        {/* Body SVG */}
+      {/* 3-col layout */}
+      <div className="grid lg:grid-cols-[320px_1fr_280px] gap-6 items-start">
+        {/* Left: Body chart */}
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-2 bg-ink-850 rounded-full p-1 border border-ink-700">
-            {['front', 'back'].map((v) => (
+            {['FRONT', 'BACK'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -197,84 +117,23 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                     : 'text-ink-400 hover:text-white'
                 }`}
               >
-                {v.charAt(0).toUpperCase() + v.slice(1)}
+                {v === 'FRONT' ? 'Front' : 'Back'}
               </button>
             ))}
           </div>
 
-          <div className="relative">
-            <div
-              className="absolute inset-0 blur-3xl opacity-25 pointer-events-none"
-              style={{
-                background: 'radial-gradient(circle at 50% 40%, rgba(198,255,61,0.35), transparent 60%)',
-              }}
-            />
-            <svg
-              viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
-              width="240"
-              height="500"
-              className="relative shrink-0 select-none"
-              style={{ overflow: 'visible' }}
-            >
-              <defs>
-                <linearGradient id="gradDead" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#b32d2d" />
-                  <stop offset="100%" stopColor="#5c0e0e" />
-                </linearGradient>
-                <linearGradient id="gradFatigued" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ff7272" />
-                  <stop offset="100%" stopColor="#c93a3a" />
-                </linearGradient>
-                <linearGradient id="gradMid" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ffa05c" />
-                  <stop offset="100%" stopColor="#e07a30" />
-                </linearGradient>
-                <linearGradient id="gradAlmost" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ffd066" />
-                  <stop offset="100%" stopColor="#ffa500" />
-                </linearGradient>
-                <linearGradient id="gradReady" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#dcff70" />
-                  <stop offset="100%" stopColor="#9bd82f" />
-                </linearGradient>
-                <linearGradient id="gradNever" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2a3040" />
-                  <stop offset="100%" stopColor="#1a1f28" />
-                </linearGradient>
-                <filter id="glowActive" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-                <style>{`
-                  .muscle-group { transition: opacity 220ms ease; }
-                  .body-outline { fill: #2a3040; stroke: #3a424f; stroke-width: 1; }
-                `}</style>
-              </defs>
-
-              <g className="body-outline">
-                {(BODY_PATHS[view]._base || []).map((d, i) => (
-                  <path key={i} d={d} />
-                ))}
-              </g>
-              {musclesInView.map((slug) => renderMuscle(slug))}
-              
-              {/* Abs 6-pack lines */}
-              {view === 'front' && (
-                <g opacity="0.35" pointerEvents="none">
-                  <line x1="110" y1="155" x2="110" y2="225" stroke="#0b0c0e" strokeWidth="1.2" />
-                  <line x1="88" y1="175" x2="132" y2="175" stroke="#0b0c0e" strokeWidth="1" />
-                  <line x1="88" y1="197" x2="132" y2="197" stroke="#0b0c0e" strokeWidth="1" />
-                  <line x1="90" y1="218" x2="130" y2="218" stroke="#0b0c0e" strokeWidth="1" />
-                </g>
-              )}
-            </svg>
-          </div>
+          <BodyMusclesChart
+            recovery={recovery}
+            view={view}
+            selectedSlug={selected}
+            hoveredSlug={hovered}
+            onMuscleClick={(slug) => setSelected((s) => (s === slug ? null : slug))}
+            onMuscleHover={(slug) => setHovered(slug)}
+            height={520}
+          />
 
           {nextReady && (
-            <div className="text-[11px] text-ink-400 text-center max-w-[240px]">
+            <div className="text-[11px] text-ink-400 text-center max-w-[280px]">
               Next ready:{' '}
               <span className="text-accent font-medium">{LABELS[nextReady.muscleGroup]}</span>{' '}
               in {fmtHours(nextReady.hoursRemaining)}
@@ -282,7 +141,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
           )}
         </div>
 
-        {/* Center: Detail panel with FIXED height container */}
+        {/* Center: Detail panel */}
         <div className="hidden lg:block">
           <div className="relative" style={{ minHeight: '480px' }}>
             {active && activeData ? (
@@ -329,18 +188,29 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
 
                 <div className="grid grid-cols-2 gap-4">
                   <Stat label="Half-life" value={fmtHours(activeData.halfLife || 48)} />
-                  <Stat label="Hours since" value={activeData.hoursSince != null ? fmtHours(activeData.hoursSince) : '—'} />
+                  <Stat
+                    label="Hours since"
+                    value={activeData.hoursSince != null ? fmtHours(activeData.hoursSince) : '—'}
+                  />
                   <Stat label="Sets 7d" value={activeData.sets7d} />
                   <Stat label="Sets 30d" value={activeData.sets30d} />
-                  <Stat label="Volume 7d" value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`} />
-                  <Stat label="Volume 30d" value={`${fmtNumber((activeData.volume30d || 0) / 1000, 1)}t`} />
+                  <Stat
+                    label="Volume 7d"
+                    value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`}
+                  />
+                  <Stat
+                    label="Volume 30d"
+                    value={`${fmtNumber((activeData.volume30d || 0) / 1000, 1)}t`}
+                  />
                 </div>
 
                 {!activeNever && activeData.percent < 90 && (
                   <div className="mt-4 pt-4 border-t border-ink-700 text-xs flex items-center gap-2 text-ink-400">
                     <Info className="w-3 h-3" />
                     Fresh in{' '}
-                    <span className="text-white font-medium">{fmtHours(activeData.hoursRemaining)}</span>
+                    <span className="text-white font-medium">
+                      {fmtHours(activeData.hoursRemaining)}
+                    </span>
                   </div>
                 )}
                 {!activeNever && activeData.percent >= 90 && (
@@ -355,15 +225,13 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                 <div className="text-sm text-ink-400">
                   Hover hoặc click vào một vùng cơ
                 </div>
-                <div className="text-xs text-ink-500 mt-1">
-                  trên hình để xem chi tiết
-                </div>
+                <div className="text-xs text-ink-500 mt-1">trên hình để xem chi tiết</div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right: Status groups — FIXED list, không đổi khi hover */}
+        {/* Right: Status pills */}
         <div className="space-y-3">
           {[
             { key: 'cooked', color: '#8a1f1f', title: 'Cooked' },
@@ -390,7 +258,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
         </div>
       </div>
 
-      {/* Mobile: detail panel dưới body */}
+      {/* Mobile detail */}
       <div className="lg:hidden">
         {active && activeData && (
           <div
@@ -413,11 +281,16 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
               </button>
             </div>
             <div className="text-xs text-ink-400 mb-3">
-              {activeNever ? 'Never trained' : `${Math.round(activeData.percent)}% · ${fmtHours(activeData.hoursRemaining)} until fresh`}
+              {activeNever
+                ? 'Never trained'
+                : `${Math.round(activeData.percent)}% · ${fmtHours(activeData.hoursRemaining)} until fresh`}
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <Stat label="Sets 7d" value={activeData.sets7d} />
-              <Stat label="Volume 7d" value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`} />
+              <Stat
+                label="Volume 7d"
+                value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`}
+              />
             </div>
           </div>
         )}
@@ -435,9 +308,6 @@ function Stat({ label, value }) {
   );
 }
 
-/**
- * Status group với chiều cao CỐ ĐỊNH để không đẩy pill khác.
- */
 function StatusGroupFixed({ title, color, items, active, setHovered, setSelected }) {
   if (!items.length) return null;
   return (
