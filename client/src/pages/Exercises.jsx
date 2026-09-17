@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, X, Play, Activity, Loader, BookOpen } from 'lucide-react';
+import { Plus, Search, X, Play, Activity, Loader, BookOpen } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import Skeleton from '../components/Skeleton.jsx';
@@ -12,13 +12,25 @@ import { fmtNumber } from '../lib/format.js';
 
 const PAGE_SIZE = 50;
 
-const TABS = [
+const SOURCE_TABS = [
   { key: 'all', label: 'All' },
-  { key: 'db', label: 'Database' },
   { key: 'anatome', label: 'Anatome (879)' },
   { key: 'video', label: 'With Video' },
   { key: 'custom', label: 'Custom' },
 ];
+
+const MUSCLE_FILTERS = [
+  '', 'traps', 'lats', 'middle-back', 'lower-back',
+  'front-delts', 'side-delts', 'rear-delts',
+  'upper-chest', 'chest',
+  'biceps', 'triceps', 'forearms',
+  'abs', 'obliques',
+  'glutes', 'quadriceps', 'hamstrings', 'calves',
+];
+
+function slugify(id) {
+  return String(id).replace(/\//g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
 export default function Exercises() {
   const toast = useToast();
@@ -26,8 +38,8 @@ export default function Exercises() {
 
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
   const [muscleSlug, setMuscleSlug] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
 
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -40,52 +52,70 @@ export default function Exercises() {
 
   const offsetRef = useRef(0);
   const sentinelRef = useRef(null);
+  const requestIdRef = useRef(0);
 
   const facets = useFetch(() => api.get('/exercises/facets'), []);
 
-  // Reset khi filter/tab đổi
+  // Debounce search
   useEffect(() => {
-    setItems([]);
-    setTotal(0);
-    setHasMore(true);
-    offsetRef.current = 0;
-  }, [tab, q, muscleSlug]);
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
-  // Load
-  const loadMore = async () => {
-    if (loading || !hasMore) return;
+  // Load page — SERVER-SIDE filter
+  const loadPage = useCallback(async (reset) => {
+    const reqId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
 
-    const offset = offsetRef.current;
+    const offset = reset ? 0 : offsetRef.current;
     const p = new URLSearchParams();
-    if (q) p.set('q', q);
+    if (debouncedQ) p.set('q', debouncedQ);
     if (muscleSlug) p.set('muscleSlug', muscleSlug);
-    p.set('source', tab === 'all' ? '' : tab);
+
+    // Source mapping
+    if (tab === 'anatome') p.set('source', 'anatome');
+    else if (tab === 'video') p.set('source', 'video');
+    else if (tab === 'custom') p.set('source', 'custom');
+    // 'all' = no source param
+
     p.set('limit', String(PAGE_SIZE));
     p.set('offset', String(offset));
 
     try {
       const res = await api.get(`/exercises?${p}`);
+      if (reqId !== requestIdRef.current) return;
+
       const list = res.exercises || [];
       const tot = res.total || 0;
-      setItems((prev) => (offset === 0 ? list : [...prev, ...list]));
+
+      if (reset) {
+        setItems(list);
+        offsetRef.current = list.length;
+      } else {
+        setItems((prev) => [...prev, ...list]);
+        offsetRef.current = offset + list.length;
+      }
       setTotal(tot);
-      offsetRef.current = offset + list.length;
-      setHasMore(offset + list.length < tot);
+      setHasMore((offset + list.length) < tot);
     } catch (e) {
+      if (reqId !== requestIdRef.current) return;
       setError(e.message);
     } finally {
-      setLoading(false);
+      if (reqId === requestIdRef.current) setLoading(false);
     }
-  };
+  }, [debouncedQ, muscleSlug, tab]);
 
+  // Reset + load khi filter đổi
   useEffect(() => {
-    if (offsetRef.current === 0 && items.length === 0) {
-      loadMore();
-    }
+    setItems([]);
+    setTotal(0);
+    setHasMore(true);
+    offsetRef.current = 0;
+    setError(null);
+    loadPage(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, q, muscleSlug]);
+  }, [debouncedQ, muscleSlug, tab]);
 
   // Infinite scroll
   useEffect(() => {
@@ -93,14 +123,12 @@ export default function Exercises() {
     const el = sentinelRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadMore();
-      },
+      (entries) => { if (entries[0].isIntersecting) loadPage(false); },
       { rootMargin: '400px' }
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, loading, loadMore]);
+  }, [hasMore, loading, loadPage]);
 
   const submitCreate = async (e) => {
     e.preventDefault();
@@ -109,7 +137,6 @@ export default function Exercises() {
       toast('Exercise created');
       setCreateOpen(false);
       setForm({ name: '', muscleGroup: 'chest', equipment: '' });
-      // Reload tab custom
       setTab('custom');
     } catch (e) {
       toast(e.message, 'error');
@@ -118,7 +145,7 @@ export default function Exercises() {
 
   const onCardClick = (ex) => {
     if (ex.source === 'anatome') {
-      navigate(`/exercises/anatome:${ex.svgId}`);
+      navigate(`/exercises/anatome:${ex.svgId || ex.id}`);
     } else {
       navigate(`/exercises/${ex.id}`);
     }
@@ -143,7 +170,7 @@ export default function Exercises() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-ink-700 overflow-x-auto">
-        {TABS.map((t) => (
+        {SOURCE_TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -158,47 +185,55 @@ export default function Exercises() {
         ))}
       </div>
 
-      {/* Search + filter */}
+      {/* Filters */}
       <div className="card p-4 space-y-3">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
-            <input
-              className="input pl-9"
-              placeholder="Tìm bài tập..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
-          <button
-            className={`btn btn-ghost ${showFilters ? 'border-accent text-accent' : ''}`}
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            <Filter className="w-4 h-4" /> Muscle
-          </button>
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
+          <input
+            className="input pl-9"
+            placeholder="Tìm bài tập (bench, squat, curl...)"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
 
-        {showFilters && (
-          <div className="pt-2 border-t border-ink-700">
-            <div className="flex flex-wrap gap-1.5">
-              {muscleSlug && (
-                <button
-                  className="chip border-accent text-accent"
-                  onClick={() => setMuscleSlug('')}
-                >
-                  <X className="w-3 h-3" /> {muscleSlug}
-                </button>
-              )}
-              {(facets.data?.muscleSlugs || []).slice(0, 40).map((m) => (
-                <button
-                  key={m}
-                  className={`chip ${muscleSlug === m ? 'border-accent text-accent' : ''}`}
-                  onClick={() => setMuscleSlug(muscleSlug === m ? '' : m)}
-                >
-                  {m}
-                </button>
-              ))}
+        {/* Muscle filter */}
+        <div className="space-y-2 pt-2 border-t border-ink-700">
+          <div className="text-[10px] uppercase tracking-wide text-ink-500">
+            Muscle
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              className={`chip text-[10px] ${muscleSlug === '' ? 'border-accent text-accent' : ''}`}
+              onClick={() => setMuscleSlug('')}
+            >
+              All
+            </button>
+            {MUSCLE_FILTERS.filter(Boolean).map((slug) => (
+              <button
+                key={slug}
+                className={`chip text-[10px] capitalize ${muscleSlug === slug ? 'border-accent text-accent' : ''}`}
+                onClick={() => setMuscleSlug(muscleSlug === slug ? '' : slug)}
+              >
+                {slug.replace(/-/g, ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(muscleSlug || debouncedQ) && (
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-ink-700">
+            <div className="text-ink-400">
+              {muscleSlug && <span className="text-accent capitalize">{muscleSlug}</span>}
+              {debouncedQ && <span className="ml-2">· "{debouncedQ}"</span>}
+              <span className="ml-2">→ {total} kết quả</span>
             </div>
+            <button
+              className="text-ink-400 hover:text-white flex items-center gap-1"
+              onClick={() => { setMuscleSlug(''); setQ(''); }}
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
           </div>
         )}
       </div>
@@ -206,7 +241,9 @@ export default function Exercises() {
       {error && (
         <div className="card p-4 text-red-400 text-sm">
           {error}{' '}
-          <button className="underline ml-2" onClick={loadMore}>Retry</button>
+          <button className="underline ml-2" onClick={() => loadPage(true)}>
+            Retry
+          </button>
         </div>
       )}
 
@@ -230,14 +267,11 @@ export default function Exercises() {
               >
                 <div className="relative bg-ink-950 rounded-lg h-40 overflow-hidden">
                   {ex.hasSvg ? (
-                    <LazySvg exerciseId={ex.svgId} className="w-full h-full p-2" />
+                    <LazySvg exerciseId={ex.svgId || ex.id} className="w-full h-full p-2" />
                   ) : ex.videoUrl ? (
                     <video
                       src={ex.videoUrl}
-                      muted
-                      loop
-                      playsInline
-                      preload="metadata"
+                      muted loop playsInline preload="metadata"
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -251,22 +285,22 @@ export default function Exercises() {
                   {ex.name}
                 </div>
 
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span className="chip text-[10px] capitalize">{ex.source}</span>
-                  {ex.muscleGroup && (
-                    <span className="chip text-[10px] capitalize">{ex.muscleGroup}</span>
+                <div className="flex flex-wrap gap-1">
+                  {ex.source && (
+                    <span className="chip text-[10px] capitalize">{ex.source}</span>
                   )}
+                  {ex.bodyPart && (
+                    <span className="chip text-[10px] capitalize">{ex.bodyPart}</span>
+                  )}
+                  {ex.muscleSlugs?.map((slug) => (
+                    <span key={slug} className="chip text-[10px] capitalize border-accent/40">
+                      {slug.replace(/-/g, ' ')}
+                    </span>
+                  ))}
                   {ex.isCustom && (
                     <span className="chip text-[10px] border-accent text-accent">custom</span>
                   )}
                 </div>
-
-                {ex.primaryMuscles?.length > 0 && (
-                  <div className="text-xs text-accent line-clamp-2 flex items-start gap-1">
-                    <Activity className="w-3 h-3 shrink-0 mt-0.5" />
-                    <span>{ex.primaryMuscles.slice(0, 3).join(', ')}</span>
-                  </div>
-                )}
               </button>
             ))}
           </div>
@@ -278,7 +312,9 @@ export default function Exercises() {
                   <Loader className="w-4 h-4 animate-spin" /> Đang tải...
                 </div>
               ) : (
-                <button className="btn btn-ghost" onClick={loadMore}>Load more</button>
+                <button className="btn btn-ghost" onClick={() => loadPage(false)}>
+                  Load more
+                </button>
               )}
             </div>
           )}
@@ -289,28 +325,25 @@ export default function Exercises() {
             </div>
           )}
         </>
-      ) : (
-        <Empty title="Không có bài tập" hint="Thử đổi filter hoặc tab." icon={Search} />
-      )}
+      ) : !loading ? (
+        <Empty
+          title="Không có bài tập"
+          hint={muscleSlug || debouncedQ ? 'Không có kết quả.' : 'Chưa có dữ liệu.'}
+          icon={Search}
+        />
+      ) : null}
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Custom Exercise">
         <form onSubmit={submitCreate} className="space-y-3">
           <div>
             <label className="label">Name</label>
-            <input
-              className="input"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
-            />
+            <input className="input" value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div>
             <label className="label">Muscle Group</label>
-            <select
-              className="input"
-              value={form.muscleGroup}
-              onChange={(e) => setForm({ ...form, muscleGroup: e.target.value })}
-            >
+            <select className="input" value={form.muscleGroup}
+              onChange={(e) => setForm({ ...form, muscleGroup: e.target.value })}>
               <option value="chest">chest</option>
               <option value="back">back</option>
               <option value="shoulders">shoulders</option>
@@ -323,11 +356,8 @@ export default function Exercises() {
           </div>
           <div>
             <label className="label">Equipment</label>
-            <input
-              className="input"
-              value={form.equipment}
-              onChange={(e) => setForm({ ...form, equipment: e.target.value })}
-            />
+            <input className="input" value={form.equipment}
+              onChange={(e) => setForm({ ...form, equipment: e.target.value })} />
           </div>
           <button className="btn btn-primary w-full justify-center">Create</button>
         </form>

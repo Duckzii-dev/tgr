@@ -36,7 +36,7 @@ export async function searchLocalExercises(query, opts = {}) {
       const haystack = [
         e.name,
         ...(e.primaryMuscles || []),
-        ...(e.secondaryMuscles || []),
+        ...(e.muscleSlugs || []),
       ].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
@@ -47,7 +47,6 @@ export async function searchLocalExercises(query, opts = {}) {
 
   const total = filtered.length;
   const sliced = filtered.slice(offset, offset + limit);
-
   return { exercises: sliced, total };
 }
 

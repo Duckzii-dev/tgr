@@ -1,20 +1,14 @@
 import { prisma } from '../utils/prisma.js';
 import { httpError } from '../middleware/error.middleware.js';
 import { volume, epley1RM } from '../utils/calc.js';
-import {
-  getMuscleContributions,
-  labelFor,
-} from '../services/muscle.service.js';
+import { getMuscleContributions, labelFor } from '../services/muscle.service.js';
 import {
   searchUnifiedExercises,
   getUnifiedExercise,
 } from '../services/unified-exercise.service.js';
 
 function computeBestForExercise(sessions) {
-  const best = {
-    max_weight: null, max_reps: null,
-    estimated_1rm: null, max_volume: null,
-  };
+  const best = { max_weight: null, max_reps: null, estimated_1rm: null, max_volume: null };
   for (const sess of sessions) {
     for (const s of sess.sets) {
       const at = sess.date;
@@ -35,19 +29,13 @@ function computeBestForExercise(sessions) {
   return Object.values(best).filter(Boolean).sort((a, b) => new Date(b.achievedAt) - new Date(a.achievedAt));
 }
 
-/**
- * GET /api/exercises
- * Search hợp nhất: DB + Anatome JSON
- */
 export async function listExercises(req, res) {
   const userId = req.user.id;
-  const { q, muscleGroup, equipment, difficulty, muscleSlug, source, limit, offset } = req.query;
+  const { q, muscleGroup, muscleSlug, source, limit, offset } = req.query;
 
   const result = await searchUnifiedExercises(userId, {
     q: q || null,
     muscleGroup: muscleGroup || null,
-    equipment: equipment || null,
-    difficulty: difficulty || null,
     muscleSlug: muscleSlug || null,
     source: source || null,
     limit: limit ? Math.min(200, Number(limit)) : 50,
@@ -57,10 +45,6 @@ export async function listExercises(req, res) {
   res.json(result);
 }
 
-/**
- * GET /api/exercises/facets
- * List facets từ hợp nhất 2 nguồn
- */
 export async function facets(req, res) {
   const userId = req.user.id;
 
@@ -76,18 +60,20 @@ export async function facets(req, res) {
     if (e.equipment) equipments.add(e.equipment);
   }
 
-  // Facets từ Anatome
   const { loadAnatomeExercises } = await import('../services/anatome.service.js');
-  const { exercises: anatomeExercises } = await loadAnatomeExercises();
+  const { exercises } = await loadAnatomeExercises();
   const muscleSlugs = new Set();
-  for (const ex of anatomeExercises) {
+  const bodyParts = new Set();
+  for (const ex of exercises) {
     for (const m of ex.muscleSlugs || []) muscleSlugs.add(m);
+    if (ex.bodyPart) bodyParts.add(ex.bodyPart);
   }
 
   res.json({
     muscleGroups: [...muscleGroups].sort(),
     equipments: [...equipments].sort(),
     muscleSlugs: [...muscleSlugs].sort(),
+    bodyParts: [...bodyParts].sort(),
   });
 }
 
@@ -112,7 +98,7 @@ export async function getExercise(req, res) {
   if (id.startsWith('anatome:')) {
     const ex = await getUnifiedExercise(userId, id);
     if (!ex) throw httpError(404, 'Exercise not found');
-    return res.json({ exercise: ex, stats: null, prs: [], sessions: [] });
+    return res.json({ exercise: ex, stats: null, prs: [], sessions: [], muscleContributions: [] });
   }
 
   // DB exercise
@@ -154,8 +140,7 @@ export async function getExercise(req, res) {
   for (const sess of sessionList) {
     let sRirSum = 0, sRirCount = 0, sRpeSum = 0, sRpeCount = 0;
     for (const s of sess.sets) {
-      totalSets++;
-      totalReps += s.reps;
+      totalSets++; totalReps += s.reps;
       totalVolume += volume(s.weight, s.reps);
       if (startingWeight == null) startingWeight = s.weight;
       if (s.weight > maxWeight) maxWeight = s.weight;

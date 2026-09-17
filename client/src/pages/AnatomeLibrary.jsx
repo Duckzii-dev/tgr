@@ -24,10 +24,20 @@ const BODY_PARTS = [
   { key: 'stretch', label: 'Stretch' },
 ];
 
+const MUSCLE_SLUGS = [
+  'traps', 'lats', 'middle-back', 'lower-back',
+  'front-delts', 'side-delts', 'rear-delts',
+  'upper-chest', 'chest',
+  'biceps', 'triceps', 'forearms',
+  'abs', 'obliques',
+  'glutes', 'quadriceps', 'hamstrings', 'calves',
+];
+
 export default function AnatomeLibrary() {
   const [q, setQ] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [bodyPart, setBodyPart] = useState('');
+  const [muscleSlug, setMuscleSlug] = useState('');
   const [detail, setDetail] = useState(null);
 
   const [items, setItems] = useState([]);
@@ -42,34 +52,26 @@ export default function AnatomeLibrary() {
 
   const meta = useFetch(() => api.get('/anatome/meta'), []);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
     return () => clearTimeout(t);
   }, [q]);
 
-  /**
-   * Load một page. `reset=true` → load từ đầu.
-   * Không dùng loading state để block, dùng requestId.
-   */
   const loadPage = useCallback(async (reset) => {
     const reqId = ++requestIdRef.current;
-
     setLoading(true);
     setError(null);
 
     const offset = reset ? 0 : offsetRef.current;
-
     const p = new URLSearchParams();
     if (debouncedQ) p.set('q', debouncedQ);
     if (bodyPart) p.set('bodyPart', bodyPart);
+    if (muscleSlug) p.set('muscleSlug', muscleSlug);
     p.set('limit', String(PAGE_SIZE));
     p.set('offset', String(offset));
 
     try {
       const res = await api.get(`/anatome/exercises?${p}`);
-
-      // Ignore stale request
       if (reqId !== requestIdRef.current) return;
 
       const list = res.exercises || [];
@@ -82,7 +84,6 @@ export default function AnatomeLibrary() {
         setItems((prev) => [...prev, ...list]);
         offsetRef.current = offset + list.length;
       }
-
       setTotal(tot);
       setHasMore((offset + list.length) < tot);
     } catch (e) {
@@ -93,36 +94,28 @@ export default function AnatomeLibrary() {
         setLoading(false);
       }
     }
-  }, [debouncedQ, bodyPart]);
+  }, [debouncedQ, bodyPart, muscleSlug]);
 
-  // Load khi filter đổi — RESET FIRST, then load
   useEffect(() => {
     setItems([]);
     setTotal(0);
     setHasMore(true);
     offsetRef.current = 0;
     setError(null);
-
-    // Force load ngay
     loadPage(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQ, bodyPart]);
+  }, [debouncedQ, bodyPart, muscleSlug]);
 
-  // Infinite scroll
   useEffect(() => {
     if (!hasMore || loading) return;
     const el = sentinelRef.current;
     if (!el) return;
-
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadPage(false);
-        }
+        if (entries[0].isIntersecting) loadPage(false);
       },
       { rootMargin: '400px' }
     );
-
     obs.observe(el);
     return () => obs.disconnect();
   }, [hasMore, loading, loadPage]);
@@ -150,26 +143,55 @@ export default function AnatomeLibrary() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {BODY_PARTS.map((bp) => (
-            <button
-              key={bp.key}
-              className={`chip ${
-                bodyPart === bp.key
-                  ? 'border-accent text-accent bg-accent/10'
-                  : ''
-              }`}
-              onClick={() => setBodyPart(bp.key)}
-            >
-              {bp.label}
-            </button>
-          ))}
+        {/* Body part filter */}
+        <div className="space-y-2">
+          <div className="text-[10px] uppercase tracking-wide text-ink-500">
+            Body Part
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {BODY_PARTS.map((bp) => (
+              <button
+                key={bp.key}
+                className={`chip ${
+                  bodyPart === bp.key
+                    ? 'border-accent text-accent bg-accent/10'
+                    : ''
+                }`}
+                onClick={() => setBodyPart(bp.key)}
+              >
+                {bp.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {(bodyPart || debouncedQ) && (
+        {/* Muscle slug filter */}
+        <div className="space-y-2 pt-2 border-t border-ink-700">
+          <div className="text-[10px] uppercase tracking-wide text-ink-500">
+            Muscle
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {MUSCLE_SLUGS.map((slug) => (
+              <button
+                key={slug}
+                className={`chip text-[10px] capitalize ${
+                  muscleSlug === slug
+                    ? 'border-accent text-accent bg-accent/10'
+                    : ''
+                }`}
+                onClick={() => setMuscleSlug(muscleSlug === slug ? '' : slug)}
+              >
+                {slug.replace(/-/g, ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(bodyPart || muscleSlug || debouncedQ) && (
           <div className="flex items-center justify-between text-xs pt-2 border-t border-ink-700">
             <div className="text-ink-400">
               {bodyPart && <span className="capitalize font-medium text-accent">{bodyPart}</span>}
+              {muscleSlug && <span className="ml-2 text-accent">{muscleSlug}</span>}
               {debouncedQ && <span className="ml-2">· "{debouncedQ}"</span>}
               <span className="ml-2">→ {total} kết quả</span>
             </div>
@@ -177,6 +199,7 @@ export default function AnatomeLibrary() {
               className="text-ink-400 hover:text-white flex items-center gap-1"
               onClick={() => {
                 setBodyPart('');
+                setMuscleSlug('');
                 setQ('');
               }}
             >
@@ -206,7 +229,6 @@ export default function AnatomeLibrary() {
           <div className="text-xs text-ink-400">
             Hiện {items.length} / {total} bài tập
           </div>
-
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {items.map((ex) => (
               <button
@@ -217,29 +239,22 @@ export default function AnatomeLibrary() {
                 <div className="relative bg-ink-950 rounded-lg h-40 overflow-hidden">
                   <LazySvg exerciseId={ex.id} className="w-full h-full p-2" />
                 </div>
-
                 <div className="font-medium text-sm line-clamp-2 min-h-[2.4em] group-hover:text-accent transition-colors">
                   {ex.name}
                 </div>
-
                 <div className="flex flex-wrap gap-1">
                   {ex.bodyPart && (
-                    <span className="chip text-[10px] capitalize">
-                      {ex.bodyPart}
-                    </span>
+                    <span className="chip text-[10px] capitalize">{ex.bodyPart}</span>
                   )}
+                  {ex.muscleSlugs?.map((slug) => (
+                    <span key={slug} className="chip text-[10px] capitalize border-accent/40">
+                      {slug.replace(/-/g, ' ')}
+                    </span>
+                  ))}
                 </div>
-
-                {ex.primaryMuscles?.length > 0 && (
-                  <div className="text-xs text-accent line-clamp-1 flex items-center gap-1">
-                    <Activity className="w-3 h-3 shrink-0" />
-                    <span>{ex.primaryMuscles.slice(0, 3).join(', ')}</span>
-                  </div>
-                )}
               </button>
             ))}
           </div>
-
           {hasMore && (
             <div ref={sentinelRef} className="flex justify-center py-6">
               {loading ? (
@@ -253,7 +268,6 @@ export default function AnatomeLibrary() {
               )}
             </div>
           )}
-
           {!hasMore && items.length >= total && total > PAGE_SIZE && (
             <div className="text-center text-xs text-ink-500 py-4">
               Đã hiển thị toàn bộ {total} bài tập
@@ -263,21 +277,12 @@ export default function AnatomeLibrary() {
       ) : !loading ? (
         <Empty
           title="Không có bài tập"
-          hint={
-            bodyPart || debouncedQ
-              ? 'Không có kết quả cho bộ lọc này.'
-              : 'Chưa có dữ liệu.'
-          }
+          hint={bodyPart || muscleSlug || debouncedQ ? 'Không có kết quả cho bộ lọc này.' : 'Chưa có dữ liệu.'}
           icon={Search}
         />
       ) : null}
 
-      <Modal
-        open={!!detail}
-        onClose={() => setDetail(null)}
-        title={detail?.name || ''}
-        wide
-      >
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.name || ''} wide>
         {detail && <ExerciseDetailContent ex={detail} />}
       </Modal>
     </div>
@@ -308,27 +313,26 @@ function ExerciseDetailContent({ ex }) {
 
   return (
     <div className="space-y-4">
-      {ex.bodyPart && (
-        <div>
-          <div className="label">Body Part</div>
-          <span className="chip border-accent text-accent capitalize">
-            {ex.bodyPart}
-          </span>
-        </div>
-      )}
-
-      {ex.primaryMuscles?.length > 0 && (
-        <div>
-          <div className="label">Primary Muscles</div>
-          <div className="flex flex-wrap gap-1.5">
-            {ex.primaryMuscles.map((m) => (
-              <span key={m} className="chip border-accent text-accent">
-                <Activity className="w-3 h-3" /> {m}
-              </span>
-            ))}
+      <div className="grid grid-cols-2 gap-3">
+        {ex.bodyPart && (
+          <div>
+            <div className="label">Body Part</div>
+            <span className="chip border-accent text-accent capitalize">{ex.bodyPart}</span>
           </div>
-        </div>
-      )}
+        )}
+        {ex.muscleSlugs?.length > 0 && (
+          <div>
+            <div className="label">Muscles</div>
+            <div className="flex flex-wrap gap-1.5">
+              {ex.muscleSlugs.map((slug) => (
+                <span key={slug} className="chip border-accent/40 capitalize text-xs">
+                  {slug.replace(/-/g, ' ')}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div>
         <div className="label mb-2">Muscle Map</div>

@@ -1,27 +1,17 @@
 import { prisma } from '../utils/prisma.js';
 import { loadAnatomeExercises } from './anatome.service.js';
 
-/**
- * Tìm exercise từ 2 nguồn:
- *   1. DB (Exercise model) — có userId null (seeded) hoặc userId = current user (custom)
- *   2. JSON Anatome (879 exercises) — chỉ metadata + SVG
- *
- * Nguồn DB ưu tiên: nếu 1 exercise có cả trong DB và JSON → dùng DB (có ID ổn định).
- * Đánh dấu `source: 'db' | 'anatome'`.
- */
 export async function searchUnifiedExercises(userId, opts = {}) {
   const {
     q,
     muscleGroup,
-    equipment,
-    difficulty,
     muscleSlug,
-    source,      // 'db' | 'anatome' | 'all' | 'video' | 'custom'
+    source,
     limit = 50,
     offset = 0,
   } = opts;
 
-  // === 1. Fetch từ DB ===
+  // === 1. Fetch DB ===
   const dbWhere = {
     OR: [{ userId: null }, { userId }],
   };
@@ -42,20 +32,20 @@ export async function searchUnifiedExercises(userId, opts = {}) {
       isCustom: true,
       videoUrl: true,
       imageUrl: true,
-      userId: true,
     },
   });
 
   const dbNames = new Set(dbExercises.map((e) => e.name.toLowerCase()));
 
-  // === 2. Fetch từ JSON Anatome ===
+  // === 2. Fetch Anatome ===
   const { exercises: anatomeExercises } = await loadAnatomeExercises();
 
   let anatomeFiltered = anatomeExercises;
   if (q) {
     const ql = q.toLowerCase();
     anatomeFiltered = anatomeFiltered.filter((e) =>
-      e.name.toLowerCase().includes(ql)
+      e.name.toLowerCase().includes(ql) ||
+      (e.muscleSlugs || []).some(m => m.toLowerCase().includes(ql))
     );
   }
   if (muscleSlug) {
@@ -67,51 +57,51 @@ export async function searchUnifiedExercises(userId, opts = {}) {
   // === 3. Merge ===
   const merged = [];
 
-  // DB exercises: source = 'db'
-  for (const ex of dbExercises) {
-    if (source === 'anatome') continue; // filter source
-    if (source === 'video' && !ex.videoUrl) continue;
-    merged.push({
-      id: ex.id,
-      name: ex.name,
-      muscleGroup: ex.muscleGroup,
-      equipment: ex.equipment,
-      isCustom: ex.isCustom,
-      videoUrl: ex.videoUrl,
-      imageUrl: ex.imageUrl,
-      source: ex.isCustom ? 'custom' : 'db',
-      primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
-      secondaryMuscles: [],
-      hasSvg: false, // DB exercises không có SVG
-    });
-  }
+  const includeDb = source !== 'anatome';
+  const includeAnatome = source !== 'db' && source !== 'custom' && source !== 'video';
 
-  // Anatome JSON: source = 'anatome'
-  // Chỉ thêm những exercise KHÔNG trùng tên với DB
-  if (source !== 'db' && source !== 'custom' && source !== 'video') {
-    for (const ex of anatomeFiltered) {
-      if (dbNames.has(ex.name.toLowerCase())) continue; // đã có trong DB
+  if (includeDb) {
+    for (const ex of dbExercises) {
+      if (source === 'video' && !ex.videoUrl) continue;
+      if (muscleSlug && ex.muscleGroup !== muscleSlug) continue;
 
       merged.push({
-        id: `anatome:${ex.id}`, // prefix để phân biệt
+        id: ex.id,
         name: ex.name,
-        muscleGroup: ex.primaryMuscles?.[0] || null,
-        equipment: null,
-        isCustom: false,
-        videoUrl: null,
-        imageUrl: null,
-        source: 'anatome',
-        primaryMuscles: ex.primaryMuscles || [],
-        secondaryMuscles: ex.secondaryMuscles || [],
-        muscleSlugs: ex.muscleSlugs || [],
-        secondarySlugs: ex.secondarySlugs || [],
-        hasSvg: true,
-        svgId: ex.id, // ID gốc để load SVG
+        muscleGroup: ex.muscleGroup,
+        bodyPart: ex.muscleGroup,
+        equipment: ex.equipment,
+        isCustom: ex.isCustom,
+        videoUrl: ex.videoUrl,
+        imageUrl: ex.imageUrl,
+        source: ex.isCustom ? 'custom' : 'db',
+        primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
+        muscleSlugs: ex.muscleGroup ? [ex.muscleGroup] : [],
+        hasSvg: false,
       });
     }
   }
 
-  // === 4. Sort + paginate ===
+  if (includeAnatome) {
+    for (const ex of anatomeFiltered) {
+      if (dbNames.has(ex.name.toLowerCase())) continue;
+
+      merged.push({
+        id: `anatome:${ex.id}`,
+        svgId: ex.id,
+        name: ex.name,
+        bodyPart: ex.bodyPart,
+        muscleGroup: ex.bodyPart,
+        muscleSlugs: ex.muscleSlugs || [],
+        primaryMuscles: ex.primaryMuscles || [],
+        secondaryMuscles: ex.secondaryMuscles || [],
+        isCustom: false,
+        source: 'anatome',
+        hasSvg: true,
+      });
+    }
+  }
+
   merged.sort((a, b) => a.name.localeCompare(b.name));
 
   const total = merged.length;
@@ -120,11 +110,7 @@ export async function searchUnifiedExercises(userId, opts = {}) {
   return { exercises: sliced, total };
 }
 
-/**
- * Lấy chi tiết 1 exercise — hỗ trợ cả id DB và `anatome:xxx`.
- */
 export async function getUnifiedExercise(userId, id) {
-  // Anatome exercise?
   if (id.startsWith('anatome:')) {
     const anatomeId = id.slice('anatome:'.length);
     const { exercises } = await loadAnatomeExercises();
@@ -133,14 +119,13 @@ export async function getUnifiedExercise(userId, id) {
     return {
       id,
       name: ex.name,
-      muscleGroup: ex.primaryMuscles?.[0] || null,
-      equipment: null,
-      isCustom: false,
-      source: 'anatome',
+      muscleGroup: ex.bodyPart,
+      bodyPart: ex.bodyPart,
+      muscleSlugs: ex.muscleSlugs || [],
       primaryMuscles: ex.primaryMuscles || [],
       secondaryMuscles: ex.secondaryMuscles || [],
-      muscleSlugs: ex.muscleSlugs || [],
-      secondarySlugs: ex.secondarySlugs || [],
+      isCustom: false,
+      source: 'anatome',
       hasSvg: true,
       svgId: ex.id,
       instructions: ex.instructions || [],
@@ -148,7 +133,6 @@ export async function getUnifiedExercise(userId, id) {
     };
   }
 
-  // DB exercise
   const ex = await prisma.exercise.findFirst({
     where: { id, OR: [{ userId: null }, { userId }] },
   });
@@ -164,7 +148,7 @@ export async function getUnifiedExercise(userId, id) {
     videoUrl: ex.videoUrl,
     imageUrl: ex.imageUrl,
     primaryMuscles: ex.muscleGroup ? [ex.muscleGroup] : [],
-    secondaryMuscles: [],
+    muscleSlugs: ex.muscleGroup ? [ex.muscleGroup] : [],
     hasSvg: false,
     instructions: ex.instructions || [],
     overview: ex.overview,
