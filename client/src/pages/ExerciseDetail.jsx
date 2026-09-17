@@ -463,6 +463,14 @@ export default function ExerciseDetail() {
         ) : (
           <Empty title="Chưa có PR" hint="Log workout để phá kỷ lục." />
         ))}
+      {/* Edit modal */}
+      <CustomExerciseModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        initialData={exercise.isCustom ? exercise : null}
+        onSaved={() => refresh()}
+      />
+
     </div>
   );
 }
