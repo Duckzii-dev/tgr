@@ -24,20 +24,8 @@ mysql_exec() {
   mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "$1" 2>/dev/null || true
 }
 
-# ------------------------------------------------------------
-# 2. Check migration status
-# ------------------------------------------------------------
-echo "[entrypoint] Checking migration status..."
-MIGRATE_STATUS=$(npx prisma migrate status 2>&1 || true)
-echo "$MIGRATE_STATUS"
-
-HAS_P3009="$(echo "$MIGRATE_STATUS" | grep -c 'P3009' || true)"
-
-# ------------------------------------------------------------
-# 3. Nếu có P3009 → pre-clean + resolve
-# ------------------------------------------------------------
-if [ "$HAS_P3009" -gt 0 ]; then
-  echo "[entrypoint] P3009 detected. Pre-cleaning partial migrations..."
+pre_clean() {
+  echo "[entrypoint] Pre-cleaning partial migrations..."
 
   # Migration 20260916010000_add_finished_at_and_pr_workout
   mysql_exec "DROP INDEX \`Workout_finishedAt_idx\` ON \`Workout\`;"
@@ -61,31 +49,69 @@ if [ "$HAS_P3009" -gt 0 ]; then
   mysql_exec "DROP TABLE IF EXISTS \`AuditLog\`;"
 
   echo "[entrypoint] Pre-clean done."
+}
 
-  FAILED=$(echo "$MIGRATE_STATUS" \
+resolve_failed() {
+  echo "[entrypoint] Resolving FAILED migrations from deploy output..."
+  # Bắt tên migration từ dòng: The `20260916010000_xxx` migration started at ... failed
+  FAILED=$(echo "$1" \
     | grep "migration started at" \
     | sed -E 's/.*`([0-9]{14}_[a-z_]+)`.*/\1/' \
     | sort -u)
 
-  if [ -n "$FAILED" ]; then
-    for MIG in $FAILED; do
-      echo "[entrypoint] Resolving FAILED migration: $MIG"
-      npx prisma migrate resolve --rolled-back "$MIG" || \
-        echo "[entrypoint] resolve failed for $MIG — continuing"
-    done
+  if [ -z "$FAILED" ]; then
+    echo "[entrypoint] No failed migration names extracted."
+    return
   fi
-else
-  echo "[entrypoint] No P3009 detected. Skipping pre-clean."
-fi
+
+  for MIG in $FAILED; do
+    echo "[entrypoint] Resolving FAILED migration: $MIG"
+    npx prisma migrate resolve --rolled-back "$MIG" || \
+      echo "[entrypoint] resolve failed for $MIG — continuing"
+  done
+}
 
 # ------------------------------------------------------------
-# 4. Apply migrations
+# 2. First attempt: migrate deploy
 # ------------------------------------------------------------
-echo "[entrypoint] Applying migrations..."
-if npx prisma migrate deploy; then
-  echo "[entrypoint] Migrations applied successfully."
+echo "[entrypoint] Applying migrations (attempt 1)..."
+DEPLOY_OUT=$(npx prisma migrate deploy 2>&1) && DEPLOY_OK=1 || DEPLOY_OK=0
+echo "$DEPLOY_OUT"
+
+if [ "$DEPLOY_OK" = "1" ]; then
+  echo "[entrypoint] Migrations applied successfully (attempt 1)."
 else
-  echo "[entrypoint] WARNING: migrate deploy failed. Starting server anyway."
+  # ----------------------------------------------------------
+  # 3. Nếu fail vì P3009 hoặc P3018 → pre-clean + resolve + retry
+  # ----------------------------------------------------------
+  if echo "$DEPLOY_OUT" | grep -q "P3009"; then
+    echo "[entrypoint] P3009 detected. Fixing..."
+    pre_clean
+    resolve_failed "$DEPLOY_OUT"
+  elif echo "$DEPLOY_OUT" | grep -q "P3018"; then
+    echo "[entrypoint] P3018 detected (partial migration). Fixing..."
+    pre_clean
+    resolve_failed "$DEPLOY_OUT"
+  else
+    echo "[entrypoint] migrate deploy failed with unknown error."
+  fi
+
+  # ----------------------------------------------------------
+  # 4. Second attempt: migrate deploy
+  # ----------------------------------------------------------
+  echo "[entrypoint] Applying migrations (attempt 2)..."
+  DEPLOY_OUT2=$(npx prisma migrate deploy 2>&1) && DEPLOY_OK2=1 || DEPLOY_OK2=0
+  echo "$DEPLOY_OUT2"
+
+  if [ "$DEPLOY_OK2" = "1" ]; then
+    echo "[entrypoint] Migrations applied successfully (attempt 2)."
+  else
+    echo "[entrypoint] WARNING: migrate deploy still failing. Starting server anyway."
+    echo "[entrypoint] Manual fix required:"
+    echo "[entrypoint]   railway ssh --service tgr"
+    echo "[entrypoint]   npx prisma migrate resolve --rolled-back <migration_name>"
+    echo "[entrypoint]   npx prisma migrate deploy"
+  fi
 fi
 
 # ------------------------------------------------------------
