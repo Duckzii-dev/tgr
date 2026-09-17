@@ -3,7 +3,10 @@ import { volume, dateKeyInTz, yearMonthInTz, isoWeekInTz } from '../utils/calc.j
 import {
   getMuscleContributions,
   MUSCLE_GROUPS_DETAILED,
-  RECOVERY_HOURS,
+  RECOVERY_HALF_LIFE,
+  halfLifeFor,
+  recoveryPercent,
+  recoveryStatus,
 } from '../services/muscle.service.js';
 
 function rangeFrom(query) {
@@ -40,9 +43,9 @@ export async function analyticsOverview(req, res) {
   const exerciseFreq = {};
   const weekly = {};
   const monthly = {};
-
   const byDayOfWeek = {};
   const byWeek = {};
+
   for (let i = 0; i < 7; i++) {
     byDayOfWeek[DOW_LABELS[i]] = {
       dow: DOW_LABELS[i], sets: 0, reps: 0, volume: 0,
@@ -51,18 +54,29 @@ export async function analyticsOverview(req, res) {
   }
 
   const now = new Date();
+  const cutoff7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+  const cutoff30 = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+
+  // ============================================================
+  // RECOVERY STATE — per muscle
+  // ============================================================
   const recovery = {};
   for (const mg of MUSCLE_GROUPS_DETAILED) {
     recovery[mg] = {
       muscleGroup: mg,
       lastTrainedAt: null,
-      sets7d: 0, sets30d: 0, volume7d: 0, volume30d: 0,
-      recoveryHours: RECOVERY_HOURS[mg] || 48,
+      lastFatigueDeposited: 0,    // fatigue units (weight×sets×reps)
+      sets7d: 0,
+      sets30d: 0,
+      volume7d: 0,
+      volume30d: 0,
+      // Sẽ tính sau
+      halfLife: halfLifeFor(mg),
+      hoursSince: null,
+      percent: 100,
+      neverTrained: true,
     };
   }
-
-  const cutoff7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-  const cutoff30 = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
   for (const w of workouts) {
     totalDuration += w.duration || 0;
@@ -99,27 +113,32 @@ export async function analyticsOverview(req, res) {
       for (const s of we.sets) {
         if (s.isWarmup) continue;
 
-        totalSets++;
-        totalReps += s.reps;
+        totalSets++; totalReps += s.reps;
         const v = volume(s.weight, s.reps);
         totalVolume += v;
 
-        dowBucket.sets += 1;
-        dowBucket.reps += s.reps;
-        dowBucket.volume += v;
+        dowBucket.sets += 1; dowBucket.reps += s.reps; dowBucket.volume += v;
         if (s.rir != null) { dowBucket.rirSum += s.rir; dowBucket.rirCount += 1; }
 
-        weekBucket.sets += 1;
-        weekBucket.reps += s.reps;
-        weekBucket.volume += v;
+        weekBucket.sets += 1; weekBucket.reps += s.reps; weekBucket.volume += v;
         if (s.rir != null) { weekBucket.rirSum += s.rir; weekBucket.rirCount += 1; }
 
+        // === Compute recovery for each target muscle ===
+        // fatigue_deposit = weight × reps × muscle_weight
         for (const [mg, weight] of Object.entries(contrib)) {
           if (!(mg in recovery)) continue;
           const rec = recovery[mg];
+
+          // Track last trained
           if (!rec.lastTrainedAt || workoutDate > new Date(rec.lastTrainedAt)) {
             rec.lastTrainedAt = workoutDate.toISOString();
+            rec.neverTrained = false;
           }
+
+          // Fatigue deposit (dùng weight × reps của set)
+          const fatigue = s.weight * s.reps * weight;
+          rec.lastFatigueDeposited += fatigue;
+
           if (isWithin7d) {
             rec.sets7d += weight;
             rec.volume7d += v * weight;
@@ -128,10 +147,41 @@ export async function analyticsOverview(req, res) {
             rec.sets30d += weight;
             rec.volume30d += v * weight;
           }
+
           muscleVolume[mg] = (muscleVolume[mg] || 0) + v * weight;
         }
       }
     }
+  }
+
+  // === Compute recovery percent (exponential) ===
+  for (const mg of MUSCLE_GROUPS_DETAILED) {
+    const rec = recovery[mg];
+    const hl = rec.halfLife;
+
+    if (rec.neverTrained || !rec.lastTrainedAt) {
+      rec.percent = 100;
+      rec.neverTrained = true;
+    } else {
+      const hoursSince = (now - new Date(rec.lastTrainedAt)) / 3600000;
+      rec.hoursSince = +hoursSince.toFixed(1);
+      rec.percent = recoveryPercent(hoursSince, hl);
+      rec.hoursRemaining = Math.max(
+        0,
+        // t = -hl × ln(1 - 0.9) = hl × 2.3026  (để đạt 90%)
+        Math.round(hl * 2.3026 - hoursSince)
+      );
+    }
+
+    // Status label
+    rec.status = recoveryStatus(rec.percent, rec.neverTrained);
+
+    // Round
+    rec.sets7d = +rec.sets7d.toFixed(1);
+    rec.sets30d = +rec.sets30d.toFixed(1);
+    rec.volume7d = Math.round(rec.volume7d);
+    rec.volume30d = Math.round(rec.volume30d);
+    rec.lastFatigueDeposited = Math.round(rec.lastFatigueDeposited);
   }
 
   const durations = workouts.map((w) => w.duration || 0).filter((d) => d > 0);
@@ -153,35 +203,15 @@ export async function analyticsOverview(req, res) {
     }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
-  const recoveryList = Object.values(recovery).map((r) => {
-    let percent = 100, hoursSince = null, hoursRemaining = null;
-    if (r.lastTrainedAt) {
-      hoursSince = (now - new Date(r.lastTrainedAt)) / 3600000;
-      const ratio = Math.min(1, hoursSince / r.recoveryHours);
-      percent = Math.round(ratio * 100);
-      hoursRemaining = Math.max(0, Math.round(r.recoveryHours - hoursSince));
-    }
-    return {
-      muscleGroup: r.muscleGroup,
-      lastTrainedAt: r.lastTrainedAt,
-      sets7d: +r.sets7d.toFixed(1),
-      sets30d: +r.sets30d.toFixed(1),
-      volume7d: Math.round(r.volume7d),
-      volume30d: Math.round(r.volume30d),
-      recoveryHours: r.recoveryHours,
-      hoursSince: hoursSince != null ? +hoursSince.toFixed(1) : null,
-      hoursRemaining,
-      percent,
-    };
-  });
-
   res.json({
     totalWorkouts: workouts.length,
     totalSets, totalReps, totalVolume, totalDuration,
     avgSession: workouts.length ? Math.round(totalDuration / workouts.length) : 0,
     minSession: durations.length ? Math.min(...durations) : 0,
     maxSession: durations.length ? Math.max(...durations) : 0,
-    muscleVolume: Object.entries(muscleVolume).map(([muscleGroup, v]) => ({ muscleGroup, volume: v })),
+    muscleVolume: Object.entries(muscleVolume).map(([muscleGroup, v]) => ({
+      muscleGroup, volume: v,
+    })),
     exerciseFrequency: Object.entries(exerciseFreq)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count),
@@ -189,7 +219,11 @@ export async function analyticsOverview(req, res) {
     monthlyDuration: Object.entries(monthly).map(([month, seconds]) => ({ month, seconds })),
     trainingLoadByDow,
     trainingLoadByWeek,
-    recovery: recoveryList,
+    recovery: Object.values(recovery),
+    recoveryModel: {
+      description: 'Exponential decay: recovery = 1 − exp(−hours / half_life)',
+      halfLives: RECOVERY_HALF_LIFE,
+    },
   });
 }
 
@@ -197,9 +231,7 @@ export async function streak(req, res) {
   const userId = req.user.id;
   const tz = await getUserTz(userId);
   const workouts = await prisma.workout.findMany({
-    where: { userId },
-    select: { date: true },
-    orderBy: { date: 'asc' },
+    where: { userId }, select: { date: true }, orderBy: { date: 'asc' },
   });
   const dates = new Set(workouts.map((w) => dateKeyInTz(w.date, tz)));
 
@@ -236,10 +268,7 @@ export async function exerciseProgression(req, res) {
   const sets = await prisma.workoutSet.findMany({
     where: {
       isWarmup: false,
-      workoutExercise: {
-        exerciseId,
-        workout: { userId, date: { gte: from, lte: to } },
-      },
+      workoutExercise: { exerciseId, workout: { userId, date: { gte: from, lte: to } } },
     },
     include: { workoutExercise: { include: { workout: true } } },
     orderBy: { workoutExercise: { workout: { date: 'asc' } } },
