@@ -22,20 +22,161 @@ export async function loadMuscleMap() {
   return _cache;
 }
 
-export async function getMuscleContributions(exercise) {
-  const map = await loadMuscleMap();
-  if (map[exercise.name]) return map[exercise.name];
+/**
+ * Convert muscle slug từ bất kỳ format nào → snake_case chuẩn.
+ *   'upper-chest' → 'upper_chest'
+ *   'upperChest'  → 'upper_chest'
+ *   'upper chest' → 'upper_chest'
+ *   'chest'       → 'chest'
+ *   'quadriceps'  → 'quads'
+ */
+export function normalizeSlug(slug) {
+  if (!slug) return null;
+  let s = String(slug).trim().toLowerCase();
 
-  // Fuzzy fallback
+  // Replace separators
+  s = s.replace(/[\s\-]+/g, '_');
+
+  // Aliases
+  const aliases = {
+    // Chest
+    upperchest: 'upper_chest',
+    upper_chest: 'upper_chest',
+    chest: 'chest',
+    mid_chest: 'chest',
+    lower_chest: 'chest',
+    pectorals: 'chest',
+    pecs: 'chest',
+
+    // Shoulders
+    front_delts: 'front_delt',
+    anterior_delts: 'front_delt',
+    front_delt: 'front_delt',
+    side_delts: 'side_delt',
+    lateral_delts: 'side_delt',
+    side_delt: 'side_delt',
+    rear_delts: 'rear_delt',
+    posterior_delts: 'rear_delt',
+    rear_delt: 'rear_delt',
+    shoulders: 'side_delt',
+    delts: 'side_delt',
+    deltoids: 'side_delt',
+
+    // Back
+    lats: 'lats',
+    latissimus: 'lats',
+    lat: 'lats',
+    traps: 'traps',
+    trapezius: 'traps',
+    upper_traps: 'traps',
+    mid_traps: 'traps',
+    middle_back: 'middle_back',
+    rhomboids: 'middle_back',
+    lower_back: 'lower_back',
+    erectors: 'lower_back',
+    erector_spinae: 'lower_back',
+    spine: 'lower_back',
+    back: 'lats',
+
+    // Arms
+    bicep: 'biceps',
+    biceps: 'biceps',
+    tricep: 'triceps',
+    triceps: 'triceps',
+    forearms: 'forearms',
+    forearm: 'forearms',
+    brachialis: 'biceps',
+
+    // Core
+    abs: 'abs',
+    abdominals: 'abs',
+    core: 'abs',
+    obliques: 'obliques',
+    obliques_: 'obliques',
+
+    // Legs
+    quads: 'quads',
+    quadriceps: 'quads',
+    quad: 'quads',
+    hamstrings: 'hamstrings',
+    hamstring: 'hamstrings',
+    hams: 'hamstrings',
+    glutes: 'glutes',
+    gluteus_maximus: 'glutes',
+    glute: 'glutes',
+    calves: 'calves',
+    calf: 'calves',
+    gastrocnemius: 'calves',
+    soleus: 'calves',
+    tibialis: 'calves',
+    adductors: 'quads',
+    abductors: 'glutes',
+    hip_flexors: 'quads',
+
+    // Neck
+    neck: 'neck',
+    traps_neck: 'neck',
+
+    // Cardio
+    cardio: 'cardio',
+  };
+
+  return aliases[s] || s;
+}
+
+/**
+ * Lấy contributions cho exercise.
+ *
+ * Priority:
+ *   1. custom muscleSlugs (JSON array trong DB)
+ *   2. lookup theo name trong exercise-muscles.json
+ *   3. muscleGroup fallback
+ */
+export async function getMuscleContributions(exercise) {
+  // ============ 1. Custom muscleSlugs ============
+  if (Array.isArray(exercise.muscleSlugs) && exercise.muscleSlugs.length > 0) {
+    const contrib = {};
+    for (const rawSlug of exercise.muscleSlugs) {
+      const normalized = normalizeSlug(rawSlug);
+      if (!normalized) continue;
+      contrib[normalized] = 1.0;
+    }
+    if (Object.keys(contrib).length > 0) return contrib;
+  }
+
+  // ============ 2. Lookup by name ============
+  const map = await loadMuscleMap();
+
+  // Exact match
+  if (map[exercise.name]) {
+    return normalizeContributions(map[exercise.name]);
+  }
+
+  // Fuzzy match
   const nameLower = exercise.name.toLowerCase();
   for (const [key, val] of Object.entries(map)) {
-    if (nameLower.includes(key.toLowerCase()) || key.toLowerCase().includes(nameLower)) {
-      return val;
+    const keyLower = key.toLowerCase();
+    if (nameLower.includes(keyLower) || keyLower.includes(nameLower)) {
+      return normalizeContributions(val);
     }
   }
 
-  const g = exercise.muscleGroup || 'other';
+  // ============ 3. muscleGroup fallback ============
+  const g = normalizeSlug(exercise.muscleGroup || 'other');
   return { [g]: 1.0 };
+}
+
+/**
+ * Normalize keys của contributions map.
+ */
+function normalizeContributions(raw) {
+  const out = {};
+  for (const [slug, weight] of Object.entries(raw)) {
+    const norm = normalizeSlug(slug);
+    if (!norm) continue;
+    out[norm] = (out[norm] || 0) + weight;
+  }
+  return out;
 }
 
 export const MUSCLE_GROUPS_DETAILED = [
@@ -64,38 +205,15 @@ export function labelFor(mg) {
   return MUSCLE_GROUP_LABELS[mg] || mg;
 }
 
-// ============================================================
-// HALF-LIFE MODEL — Scientific based
-// Large muscles need more recovery (48-72h)
-// Small muscles recover faster (24-36h)
-// ============================================================
 export const RECOVERY_HALF_LIFE = {
-  // Large muscles (48-72h)
-  chest: 60,
-  upper_chest: 60,
-  lats: 60,
-  middle_back: 60,
-  lower_back: 72,
-  quads: 66,
-  hamstrings: 66,
-  glutes: 60,
-  traps: 48,
-
-  // Medium (36-48h)
-  front_delt: 42,
-  side_delt: 40,
-  rear_delt: 40,
-  biceps: 40,
-  triceps: 40,
-
-  // Small (24-36h)
-  forearms: 30,
-  calves: 36,
-  abs: 30,
-  obliques: 30,
+  chest: 60, upper_chest: 60,
+  lats: 60, middle_back: 60, lower_back: 72,
+  quads: 66, hamstrings: 66, glutes: 60, traps: 48,
+  front_delt: 42, side_delt: 40, rear_delt: 40,
+  biceps: 40, triceps: 40,
+  forearms: 30, calves: 36,
+  abs: 30, obliques: 30,
   neck: 24,
-
-  // Cardio
   cardio: 24,
 };
 
@@ -105,11 +223,6 @@ export function halfLifeFor(muscleGroup) {
 
 export const RECOVERY_HOURS = RECOVERY_HALF_LIFE;
 
-/**
- * Exponential recovery model.
- * recovery = 1 − exp(−hours_since / half_life)
- * @returns {number} 0-100
- */
 export function recoveryPercent(hoursSince, halfLife) {
   if (hoursSince <= 0) return 0;
   if (!halfLife || halfLife <= 0) return 100;
@@ -117,9 +230,6 @@ export function recoveryPercent(hoursSince, halfLife) {
   return Math.round(recovery * 1000) / 10;
 }
 
-/**
- * Status label.
- */
 export function recoveryStatus(percent, neverTrained) {
   if (neverTrained) return { status: 'never', label: 'Never trained', color: '#5a6470' };
   if (percent >= 90) return { status: 'fresh', label: 'Fresh', color: '#c6ff3d' };
