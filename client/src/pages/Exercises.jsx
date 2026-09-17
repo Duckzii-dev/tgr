@@ -15,9 +15,6 @@ const PAGE_SIZE = 50;
 
 const SOURCE_TABS = [
   { key: 'all', label: 'All' },
-  { key: 'anatome', label: 'Anatome (879)' },
-  { key: 'db', label: 'Database' },
-  { key: 'video', label: 'With Video' },
   { key: 'custom', label: 'Custom' },
 ];
 

@@ -6,12 +6,13 @@ export async function evaluatePRs({
   exerciseId,
   weight,
   reps,
+  rir = null,
   achievedAt,
   excludeWorkoutId,
 }) {
   const w = Number(weight);
   const r = Number(reps);
-  const est = epley1RM(w, r);
+  const est = epley1RM(w, r, rir ?? null);
   const vol = volume(w, r);
 
   const candidates = [
@@ -48,7 +49,7 @@ export async function evaluatePRs({
     if (s.reps > priorBest.max_reps) priorBest.max_reps = s.reps;
     const v = volume(s.weight, s.reps);
     if (v > priorBest.max_volume) priorBest.max_volume = v;
-    const e = s.estimated1RM ?? epley1RM(s.weight, s.reps);
+    const e = s.estimated1RM ?? epley1RM(s.weight, s.reps, s.rir ?? null);
     if (e != null && e > priorBest.estimated_1rm) priorBest.estimated_1rm = e;
   }
 

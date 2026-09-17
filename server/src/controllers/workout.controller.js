@@ -202,6 +202,7 @@ export async function finishWorkout(req, res) {
         exerciseId: we.exerciseId,
         weight: s.weight,
         reps: s.reps,
+        rir: s.rir,
         achievedAt: endTime,
         excludeWorkoutId: id,
       });
@@ -369,7 +370,7 @@ export async function addSet(req, res) {
       rir: rir != null ? Number(rir) : null,
       rpe: rpe != null ? Number(rpe) : null,
       restSeconds: restSeconds != null ? Number(restSeconds) : null,
-      estimated1RM: epley1RM(weight, reps),
+      estimated1RM: epley1RM(weight, reps, rir),
       isWarmup: !!isWarmup,
     },
   });
@@ -394,7 +395,7 @@ export async function updateSet(req, res) {
       rpe: rpe !== undefined ? (rpe === null ? null : Number(rpe)) : ex.rpe,
       restSeconds: restSeconds != null ? Number(restSeconds) : ex.restSeconds,
       isWarmup: isWarmup != null ? !!isWarmup : ex.isWarmup,
-      estimated1RM: epley1RM(w, r),
+      estimated1RM: epley1RM(w, r, rir != null ? Number(rir) : ex.rir),
     },
   });
   res.json({ set });

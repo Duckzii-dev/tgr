@@ -1,21 +1,72 @@
-// volume = weight * reps
+// ============================================================
+// VOLUME
+// ============================================================
 export function volume(weight, reps) {
   return Number(weight) * Number(reps);
 }
 
-// Epley 1RM (skip if reps > 20 to avoid meaningless values)
-export function epley1RM(weight, reps) {
+// ============================================================
+// e1RM với RIR adjustment
+//
+// Công thức:
+//   e1RM = Weight × (1 + (Reps + RIR) / 30)
+//
+// Trong đó:
+//   - Reps = số rep thực hiện
+//   - RIR  = Reps In Reserve (số rep còn dự trữ)
+//   - Reps + RIR = số rep ước tính nếu set tới failure
+//
+// Quy tắc:
+//   - Nếu có RIR → dùng RIR adjustment.
+//   - Nếu không có RIR → Epley chuẩn (RIR = 0, tức coi như sát failure).
+//   - Chỉ tính cho reps ≤ 20 (trên ngưỡng này e1RM thiếu chính xác).
+//   - RIR hợp lệ: 0-5. Trên 5 → coi là 5 (chặn ảnh hưởng quá lớn).
+// ============================================================
+export function epley1RM(weight, reps, rir = null) {
   const w = Number(weight);
   const r = Number(reps);
-  if (!w || !r || r <= 0 || r > 20) return null;
-  return +(w * (1 + r / 30)).toFixed(2);
+
+  if (!w || !r || r <= 0) return null;
+
+  // Chỉ tính cho reps ≤ 20
+  if (r > 20) return null;
+
+  // Clamp RIR: 0-5, mặc định 0 nếu null/undefined
+  let effectiveRir = 0;
+  if (rir != null) {
+    effectiveRir = Math.max(0, Math.min(5, Number(rir) || 0));
+  }
+
+  const totalReps = r + effectiveRir;
+
+  // Nếu total reps > 25 → quá xa failure → không đáng tin
+  if (totalReps > 25) return null;
+
+  const e1rm = w * (1 + totalReps / 30);
+  return +e1rm.toFixed(2);
 }
 
+// ============================================================
+// e1RM dùng actual 1RM nếu user thực sự test 1RM
+// ============================================================
+export function effective1RM(weight, reps, rir = null, actual1RM = null) {
+  if (actual1RM != null && Number(actual1RM) > 0) {
+    return Number(actual1RM);
+  }
+  return epley1RM(weight, reps, rir);
+}
+
+// ============================================================
+// Duration (giữ nguyên)
+// ============================================================
 export function durationSeconds(start, end) {
   if (!start || !end) return null;
   return Math.max(0, Math.round((new Date(end) - new Date(start)) / 1000));
 }
 
+// ============================================================
+// ISO week (giữ nguyên)
+// ============================================================
 export function isoWeek(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -29,9 +80,9 @@ export function isoWeek(date) {
   return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
 }
 
-/**
- * Trả về YYYY-MM-DD theo timezone chỉ định (IANA).
- */
+// ============================================================
+// Timezone helpers (giữ nguyên)
+// ============================================================
 export function dateKeyInTz(date, timezone = 'UTC') {
   try {
     const fmt = new Intl.DateTimeFormat('en-CA', {
@@ -40,24 +91,18 @@ export function dateKeyInTz(date, timezone = 'UTC') {
       month: '2-digit',
       day: '2-digit',
     });
-    return fmt.format(new Date(date)); // en-CA → YYYY-MM-DD
+    return fmt.format(new Date(date));
   } catch {
     return new Date(date).toISOString().slice(0, 10);
   }
 }
 
-/**
- * Trả về {year, month} theo timezone.
- */
 export function yearMonthInTz(date, timezone = 'UTC') {
   const key = dateKeyInTz(date, timezone);
   const [year, month] = key.split('-').map(Number);
   return { year, month };
 }
 
-/**
- * ISO week key theo timezone.
- */
 export function isoWeekInTz(date, timezone = 'UTC') {
   const key = dateKeyInTz(date, timezone);
   const [y, m, d] = key.split('-').map(Number);
