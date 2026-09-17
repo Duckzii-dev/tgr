@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Plus, Activity, ArrowLeft, Info } from 'lucide-react';
+import { Plus, Activity, ArrowLeft, Info, Edit3, Trash2 } from 'lucide-react';
 import { useFetch } from '../hooks/useFetch.js';
 import { api } from '../lib/api.js';
 import Skeleton from '../components/Skeleton.jsx';
@@ -9,14 +9,18 @@ import StatCard from '../components/StatCard.jsx';
 import LineChartCard from '../components/LineChartCard.jsx';
 import StrengthLevelCard from '../components/StrengthLevelCard.jsx';
 import { fmtDate, fmtNumber } from '../lib/format.js';
+import CustomExerciseModal from '../components/CustomExerciseModal.jsx';
+import { useAuth } from '../lib/auth.jsx';
 
 const TABS = ['Overview', 'History', 'Progression', 'Intensity', 'PRs'];
 const RANGES = { '30D': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 99999 };
 
 export default function ExerciseDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [tab, setTab] = useState('Overview');
   const [range, setRange] = useState('3M');
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data, loading, error, refresh } = useFetch(
     () => api.get(`/exercises/${encodeURIComponent(id)}`),
@@ -106,11 +110,33 @@ export default function ExerciseDetail() {
                   Anatome
                 </span>
               )}
+              {exercise.isCustom && (
+                <span className="ml-2 chip text-[10px] border-accent text-accent">
+                  Custom
+                </span>
+              )}
             </div>
+            {exercise.muscleSlugs?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {exercise.muscleSlugs.map((slug) => (
+                  <span key={slug} className="chip text-[10px] capitalize border-accent/40">
+                    {slug.replace(/-/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
             {exercise.overview && (
               <p className="text-sm text-ink-300 mt-3">{exercise.overview}</p>
             )}
           </div>
+          {exercise.isCustom && (
+            <button
+              className="btn btn-ghost shrink-0"
+              onClick={() => setEditOpen(true)}
+            >
+              <Edit3 className="w-4 h-4" /> Edit
+            </button>
+          )}
         </div>
       </div>
 
