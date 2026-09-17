@@ -1,777 +1,717 @@
 #!/usr/bin/env bash
 # ================================================================
-# FEATURE 9: RECOVERY MAP REDESIGN — UX/UI ĐẸP + SIDE VIEW
-# 3 view: FRONT / SIDE / BACK, gradient, glow, animation
-# Chạy từ root: bash feature9-recovery-redesign.sh
+# FEATURE 12: FLATTEN ANATOME JSON + LIBRARY UI REDESIGN
+# Chạy từ root: bash feature12-anatome-flatten.sh
 # ================================================================
 set -euo pipefail
 
 ROOT="$(pwd)"
 echo "📁 Root: $ROOT"
 
-mkdir -p client/src/components
-
 # ============================================================
-# 1. MuscleRecoveryMap.jsx — REDESIGN
+# 1. server/scripts/sync-anatome-exercises.js (flatten)
 # ============================================================
-cat > client/src/components/MuscleRecoveryMap.jsx <<'EOF'
-import { useMemo, useState } from 'react';
-import { fmtNumber } from '../lib/format.js';
-import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
+mkdir -p server/scripts
+cat > server/scripts/sync-anatome-exercises.js <<'EOF'
+#!/usr/bin/env node
+/**
+ * Sync Anatome exercises → local JSON (flattened).
+ * Bỏ `raw`, giữ các field cần dùng.
+ * Usage: node server/scripts/sync-anatome-exercises.js
+ */
 
-const LABELS = {
-  neck: 'Neck',
-  traps: 'Traps',
-  front_delt: 'Front Delt',
-  side_delt: 'Side Delt',
-  rear_delt: 'Rear Delt',
-  upper_chest: 'Upper Chest',
-  chest: 'Chest',
-  lats: 'Lats',
-  middle_back: 'Middle Back',
-  lower_back: 'Lower Back',
-  biceps: 'Biceps',
-  triceps: 'Triceps',
-  forearms: 'Forearms',
-  abs: 'Abs',
-  obliques: 'Obliques',
-  glutes: 'Glutes',
-  quads: 'Quads',
-  hamstrings: 'Hamstrings',
-  calves: 'Calves',
-  cardio: 'Cardio',
-};
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const GROUP_COLORS = {
-  chest: '#ff5e5e',
-  back: '#b494ff',
-  shoulders: '#5ed3ff',
-  arms: '#ff6ec7',
-  core: '#88e0c0',
-  legs: '#f7b801',
-};
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Color theo % recovery — gradient mượt
-function recoveryFill(percent, never) {
-  if (never) return '#2a3040';
-  if (percent >= 95) return 'url(#gradReady)';
-  if (percent >= 75) return 'url(#gradAlmost)';
-  if (percent >= 50) return 'url(#gradMid)';
-  if (percent >= 25) return 'url(#gradFatigued)';
-  return 'url(#gradDead)';
+const API_BASE = 'https://api.anatome.dev';
+const OUT_FILE = path.join(__dirname, '..', 'public', 'anatome-exercises.json');
+
+const args = process.argv.slice(2);
+const DRY = args.includes('--dry');
+const LIMIT = (() => {
+  const idx = args.indexOf('--limit');
+  if (idx >= 0 && args[idx + 1]) return Number(args[idx + 1]);
+  return 0;
+})();
+
+const POPULAR_QUERIES = [
+  'bench', 'chest', 'fly', 'push', 'pec', 'dip',
+  'row', 'pull', 'lat', 'deadlift', 'shrug', 'back',
+  'shoulder', 'press', 'raise', 'delt', 'overhead',
+  'curl', 'tricep', 'bicep', 'extension', 'hammer', 'skull',
+  'squat', 'lunge', 'leg', 'calf', 'glute', 'hamstring', 'quad',
+  'crunch', 'plank', 'sit-up', 'ab', 'russian', 'leg raise',
+  'run', 'bike', 'jump', 'burpee', 'rope', 'stretch', 'mobility',
+];
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+  return res.json();
 }
 
-function recoverySolid(percent, never) {
-  if (never) return '#2a3040';
-  if (percent >= 95) return '#c6ff3d';
-  if (percent >= 75) return '#ffb038';
-  if (percent >= 50) return '#ff8f3d';
-  if (percent >= 25) return '#ff5e5e';
-  return '#8a1f1f';
+async function searchExercises(query, limit = 50) {
+  const params = new URLSearchParams({ q: query, limit: String(limit) });
+  try {
+    const data = await fetchJSON(`${API_BASE}/searchExercises?${params}`);
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.exercises)) return data.exercises;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.data)) return data.data;
+    return [];
+  } catch (e) {
+    console.warn(`  ⚠️  searchExercises("${query}") failed: ${e.message}`);
+    return [];
+  }
 }
 
-function fmtHours(h) {
-  if (h == null) return '—';
-  if (h < 1) return `${Math.round(h * 60)}m`;
-  if (h < 24) return `${h}h`;
-  return `${(h / 24).toFixed(1)}d`;
-}
+/**
+ * Flatten exercise — bỏ raw, giữ field cần dùng.
+ */
+function normalizeExercise(raw) {
+  if (!raw) return null;
+  const r = raw.raw || raw;
 
-export default function MuscleRecoveryMap({ recovery = [] }) {
-  const [hovered, setHovered] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [view, setView] = useState('front'); // 'front' | 'side' | 'back'
+  // ID ưu tiên ext_id (slug ổn định), fallback raw.id
+  const id = r.ext_id || raw.id || raw.name?.toLowerCase().replace(/\s+/g, '_');
 
-  const byGroup = {};
-  for (const r of recovery) byGroup[r.muscleGroup] = r;
+  // Primary muscles: ưu tiên source (tên người đọc) rồi mới tới anatome slug
+  const primaryMuscles =
+    r.primaryMuscles ||
+    r.source_primaryMuscles ||
+    [];
+  const secondaryMuscles =
+    r.secondaryMuscles ||
+    r.source_secondaryMuscles ||
+    raw.secondaryMuscles ||
+    [];
 
-  const get = (g) =>
-    byGroup[g] || {
-      muscleGroup: g, percent: 100, sets7d: 0, sets30d: 0,
-      volume7d: 0, volume30d: 0, hoursRemaining: null,
-      hoursSince: null, lastTrainedAt: null,
-    };
+  // Anatome slugs
+  const muscleSlugs = r.anatome_primary_slugs || raw.muscleSlugs || [];
+  const secondarySlugs = r.anatome_secondary_slugs || [];
 
-  const active = hovered || selected;
-  const activeData = active ? get(active) : null;
-  const activeNever = activeData ? !activeData.lastTrainedAt : false;
+  // Layers payload để render muscle map khi cần
+  const layersPayload = r.anatome_layers_payload || [];
 
-  const fillFor = (g) => {
-    const r = get(g);
-    const never = !r.lastTrainedAt;
-    const isActive = active === g;
-    const dim = active && !isActive;
-    return {
-      fill: recoveryFill(r.percent, never),
-      opacity: dim ? 0.35 : 1,
-      filter: isActive ? 'url(#glowActive)' : undefined,
-    };
+  // Body part fallback từ primary muscles
+  const bodyPart =
+    raw.bodyPart ||
+    (primaryMuscles.length ? primaryMuscles[0] : null);
+
+  return {
+    id,
+    name: raw.name || r.name,
+    bodyPart,
+
+    primaryMuscles,
+    secondaryMuscles,
+    muscleSlugs,
+    secondarySlugs,
+    layersPayload,
+
+    equipment: raw.equipment || r.equipment || null,
+    category: raw.category || r.category || null,
+    difficulty: raw.difficulty || r.level || null,
+    mechanic: raw.mechanic || r.mechanic || null,
+    force: raw.force || r.force || null,
+    movementType: r.movementType || null,
+
+    instructions: raw.instructions || r.instructions || [],
+    description: raw.description || null,
+
+    videoUrl: r.video_url || raw.videoUrl || null,
+    videoSpecific: r.video_exercise_specific || false,
+    hasLicensedMedia: r.has_licensed_media || false,
+
+    keywords: r.keywords || [],
   };
+}
 
-  const handlers = (g) => ({
-    onMouseEnter: () => setHovered(g),
-    onMouseLeave: () => setHovered(null),
-    onClick: () => setSelected((s) => (s === g ? null : g)),
-    style: {
-      cursor: 'pointer',
-      transition: 'opacity 220ms ease, filter 220ms ease',
-      ...fillFor(g),
-    },
+async function main() {
+  console.log('🚀 Sync Anatome exercises → local JSON (flattened)');
+  console.log(`   API: ${API_BASE}`);
+  console.log(`   Output: ${OUT_FILE}`);
+  console.log(`   Dry run: ${DRY}`);
+  console.log(`   Limit: ${LIMIT || 'unlimited'}`);
+  console.log('');
+
+  await fs.mkdir(path.dirname(OUT_FILE), { recursive: true });
+
+  const seen = new Map();
+  let totalFetched = 0;
+
+  for (const q of POPULAR_QUERIES) {
+    process.stdout.write(`   Searching "${q}"... `);
+    const results = await searchExercises(q, LIMIT || 100);
+    totalFetched += results.length;
+
+    for (const r of results) {
+      const norm = normalizeExercise(r);
+      if (!norm || !norm.id) continue;
+      if (!seen.has(norm.id)) seen.set(norm.id, norm);
+    }
+    console.log(`${results.length} → ${seen.size} unique total`);
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  console.log('');
+  console.log(`📊 Total fetched: ${totalFetched}`);
+  console.log(`📊 Unique exercises: ${seen.size}`);
+
+  if (seen.size === 0) {
+    console.error('❌ No exercises fetched. API may be down.');
+    process.exit(1);
+  }
+
+  const sorted = [...seen.values()].sort((a, b) => {
+    const bp = (a.bodyPart || '').localeCompare(b.bodyPart || '');
+    if (bp !== 0) return bp;
+    return (a.name || '').localeCompare(b.name || '');
   });
 
-  const labelText = (g) => {
-    const r = get(g);
-    const never = !r.lastTrainedAt;
-    return never ? '' : `${r.percent}`;
+  const output = {
+    _meta: {
+      source: 'https://api.anatome.dev',
+      repo: 'https://github.com/NextSolutionsStudio/anatome',
+      license: 'Apache-2.0',
+      syncedAt: new Date().toISOString(),
+      totalExercises: sorted.length,
+      queries: POPULAR_QUERIES.length,
+    },
+    exercises: sorted,
   };
 
-  const groupsByStatus = useMemo(() => {
-    const groups = recovery.filter((r) => r.muscleGroup !== 'cardio');
-    return {
-      ready: groups.filter((g) => g.percent >= 95 && g.lastTrainedAt),
-      recovering: groups.filter((g) => g.percent < 95 && g.percent >= 50),
-      fatigued: groups.filter((g) => g.percent < 50 && g.lastTrainedAt),
-      never: groups.filter((g) => !g.lastTrainedAt),
+  if (DRY) {
+    console.log('🔍 Dry run — sample:');
+    console.log(JSON.stringify(sorted.slice(0, 2), null, 2));
+    return;
+  }
+
+  await fs.writeFile(OUT_FILE, JSON.stringify(output, null, 2), 'utf8');
+  const stats = await fs.stat(OUT_FILE);
+  console.log(`✅ Wrote ${OUT_FILE}`);
+  console.log(`   Size: ${(stats.size / 1024).toFixed(1)} KB`);
+  console.log(`   Exercises: ${sorted.length}`);
+  console.log('');
+
+  const byPart = {};
+  for (const e of sorted) {
+    const bp = e.bodyPart || 'unknown';
+    byPart[bp] = (byPart[bp] || 0) + 1;
+  }
+  console.log('📈 By body part:');
+  for (const [bp, count] of Object.entries(byPart).sort((a, b) => b[1] - a[1])) {
+    console.log(`   ${bp.padEnd(20)} ${count}`);
+  }
+  console.log('');
+  console.log('🎉 Sync complete.');
+}
+
+main().catch((e) => {
+  console.error('❌ Fatal:', e);
+  process.exit(1);
+});
+EOF
+chmod +x server/scripts/sync-anatome-exercises.js
+echo "✅ server/scripts/sync-anatome-exercises.js"
+
+# ============================================================
+# 2. server/src/services/anatome.service.js
+# ============================================================
+mkdir -p server/src/services
+cat > server/src/services/anatome.service.js <<'EOF'
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const EXERCISES_FILE = path.join(
+  __dirname, '..', '..', 'public', 'anatome-exercises.json'
+);
+
+let _cache = null;
+
+export async function loadAnatomeExercises() {
+  if (_cache) return _cache;
+  try {
+    const raw = await fs.readFile(EXERCISES_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    _cache = {
+      meta: data._meta || {},
+      exercises: data.exercises || [],
     };
-  }, [recovery]);
+  } catch {
+    _cache = { meta: {}, exercises: [] };
+  }
+  return _cache;
+}
+
+export async function searchLocalExercises(query, opts = {}) {
+  const { exercises } = await loadAnatomeExercises();
+  const {
+    bodyPart, equipment, muscleSlug, difficulty, category,
+    limit = 50, offset = 0,
+  } = opts;
+
+  const q = String(query || '').toLowerCase().trim();
+
+  const filtered = exercises.filter((e) => {
+    if (q) {
+      const haystack = [
+        e.name,
+        ...(e.keywords || []),
+        ...(e.primaryMuscles || []),
+        ...(e.secondaryMuscles || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (bodyPart && e.bodyPart !== bodyPart) return false;
+    if (equipment && e.equipment !== equipment) return false;
+    if (difficulty && e.difficulty !== difficulty) return false;
+    if (category && e.category !== category) return false;
+    if (muscleSlug && !(e.muscleSlugs || []).includes(muscleSlug)) return false;
+    return true;
+  });
+
+  const total = filtered.length;
+  const sliced = filtered.slice(offset, offset + limit);
+
+  return { exercises: sliced, total };
+}
+
+export async function getLocalExercise(id) {
+  const { exercises } = await loadAnatomeExercises();
+  return exercises.find((e) => e.id === id) || null;
+}
+
+export async function listFacets() {
+  const { exercises } = await loadAnatomeExercises();
+  const bodyParts = new Set();
+  const equipments = new Set();
+  const difficulties = new Set();
+  const categories = new Set();
+  const muscleSlugs = new Set();
+
+  for (const e of exercises) {
+    if (e.bodyPart) bodyParts.add(e.bodyPart);
+    if (e.equipment) equipments.add(e.equipment);
+    if (e.difficulty) difficulties.add(e.difficulty);
+    if (e.category) categories.add(e.category);
+    for (const m of e.muscleSlugs || []) muscleSlugs.add(m);
+  }
+
+  return {
+    bodyParts: [...bodyParts].sort(),
+    equipments: [...equipments].sort(),
+    difficulties: [...difficulties].sort(),
+    categories: [...categories].sort(),
+    muscleSlugs: [...muscleSlugs].sort(),
+    total: exercises.length,
+  };
+}
+EOF
+echo "✅ server/src/services/anatome.service.js"
+
+# ============================================================
+# 3. server/src/controllers/anatome.controller.js
+# ============================================================
+mkdir -p server/src/controllers
+cat > server/src/controllers/anatome.controller.js <<'EOF'
+import { httpError } from '../middleware/error.middleware.js';
+import {
+  searchLocalExercises,
+  getLocalExercise,
+  listFacets,
+  loadAnatomeExercises,
+} from '../services/anatome.service.js';
+
+export async function searchExercises(req, res) {
+  const { q, bodyPart, equipment, muscleSlug, difficulty, category, limit, offset } = req.query;
+  const result = await searchLocalExercises(q, {
+    bodyPart: bodyPart || null,
+    equipment: equipment || null,
+    muscleSlug: muscleSlug || null,
+    difficulty: difficulty || null,
+    category: category || null,
+    limit: limit ? Math.min(200, Number(limit)) : 50,
+    offset: offset ? Number(offset) : 0,
+  });
+  res.json(result);
+}
+
+export async function getExercise(req, res) {
+  const { id } = req.params;
+  const exercise = await getLocalExercise(id);
+  if (!exercise) throw httpError(404, 'Exercise not found');
+  res.json({ exercise });
+}
+
+export async function facets(_req, res) {
+  const data = await listFacets();
+  res.json(data);
+}
+
+export async function meta(_req, res) {
+  const { meta, exercises } = await loadAnatomeExercises();
+  res.json({ meta, total: exercises.length });
+}
+EOF
+echo "✅ server/src/controllers/anatome.controller.js"
+
+# ============================================================
+# 4. client/src/pages/AnatomeLibrary.jsx
+# ============================================================
+mkdir -p client/src/pages
+cat > client/src/pages/AnatomeLibrary.jsx <<'EOF'
+import { useState } from 'react';
+import { Search, Filter, X, Play, Activity } from 'lucide-react';
+import { useFetch } from '../hooks/useFetch.js';
+import { api } from '../lib/api.js';
+import Skeleton from '../components/Skeleton.jsx';
+import Empty from '../components/Empty.jsx';
+import Modal from '../components/Modal.jsx';
+import { fmtNumber } from '../lib/format.js';
+
+const API_ANATOME = 'https://api.anatome.dev';
+
+function buildAnatomeUrl(ex) {
+  if (!ex?.layersPayload?.length) return null;
+  const layers = ex.layersPayload
+    .map((l) => {
+      const color = (l.color || '#DC2626').replace('#', '');
+      const muscles = (l.muscles || []).join('%2C');
+      return `${color}:${muscles}`;
+    })
+    .join(',');
+  return `${API_ANATOME}/generateImage?gender=male&view=dual&layers=${layers}&output=raw`;
+}
+
+export default function AnatomeLibrary() {
+  const [q, setQ] = useState('');
+  const [bodyPart, setBodyPart] = useState('');
+  const [equipment, setEquipment] = useState('');
+  const [difficulty, setDifficulty] = useState('');
+  const [muscleSlug, setMuscleSlug] = useState('');
+  const [category, setCategory] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [detail, setDetail] = useState(null);
+
+  const facets = useFetch(() => api.get('/anatome/facets'), []);
+  const meta = useFetch(() => api.get('/anatome/meta'), []);
+
+  const { data, loading } = useFetch(
+    () => {
+      const p = new URLSearchParams();
+      if (q) p.set('q', q);
+      if (bodyPart) p.set('bodyPart', bodyPart);
+      if (equipment) p.set('equipment', equipment);
+      if (difficulty) p.set('difficulty', difficulty);
+      if (muscleSlug) p.set('muscleSlug', muscleSlug);
+      if (category) p.set('category', category);
+      p.set('limit', '100');
+      return api.get(`/anatome/exercises?${p}`);
+    },
+    [q, bodyPart, equipment, difficulty, muscleSlug, category]
+  );
+
+  const exercises = data?.exercises || [];
+  const total = data?.total || 0;
+  const hasFilters = bodyPart || equipment || difficulty || muscleSlug || category;
+
+  const clearFilters = () => {
+    setBodyPart('');
+    setEquipment('');
+    setDifficulty('');
+    setMuscleSlug('');
+    setCategory('');
+  };
 
   return (
-    <div className="card p-4 sm:p-6 space-y-5 overflow-hidden relative">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="font-semibold text-lg">Muscle Recovery</div>
-          <div className="text-xs text-ink-400 mt-0.5">
-            {groupsByStatus.ready.length} ready ·{' '}
-            {groupsByStatus.recovering.length} recovering ·{' '}
-            {groupsByStatus.fatigued.length} fatigued
-          </div>
-        </div>
-        {/* Legend */}
-        <div className="flex items-center gap-2 text-[10px] text-ink-400">
-          {[
-            { color: '#8a1f1f', label: 'Fatigued' },
-            { color: '#ff5e5e', label: 'Low' },
-            { color: '#ff8f3d', label: 'Mid' },
-            { color: '#ffb038', label: 'Almost' },
-            { color: '#c6ff3d', label: 'Ready' },
-          ].map((l) => (
-            <div key={l.label} className="flex items-center gap-1">
-              <span
-                className="w-2.5 h-2.5 rounded-full"
-                style={{
-                  background: l.color,
-                  boxShadow: `0 0 6px ${l.color}88`,
-                }}
-              />
-              <span>{l.label}</span>
-            </div>
-          ))}
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold">Exercise Library</h1>
+        <p className="text-sm text-ink-400 mt-1">
+          {fmtNumber(meta.data?.total) || '...'} bài tập từ Anatome DB · Apache-2.0
+        </p>
       </div>
 
-      <div className="grid lg:grid-cols-[auto_1fr] gap-6 items-start">
-        {/* Body panel */}
-        <div className="flex flex-col items-center gap-3 mx-auto lg:mx-0">
-          {/* View switcher */}
-          <div className="flex items-center gap-2 bg-ink-850 rounded-full p-1 border border-ink-700">
-            <button
-              onClick={() => setView('front')}
-              className={`px-3 py-1 rounded-full text-xs transition-all ${
-                view === 'front'
-                  ? 'bg-accent text-ink-950 font-semibold'
-                  : 'text-ink-400 hover:text-white'
-              }`}
-            >
-              Front
-            </button>
-            <button
-              onClick={() => setView('side')}
-              className={`px-3 py-1 rounded-full text-xs transition-all ${
-                view === 'side'
-                  ? 'bg-accent text-ink-950 font-semibold'
-                  : 'text-ink-400 hover:text-white'
-              }`}
-            >
-              Side
-            </button>
-            <button
-              onClick={() => setView('back')}
-              className={`px-3 py-1 rounded-full text-xs transition-all ${
-                view === 'back'
-                  ? 'bg-accent text-ink-950 font-semibold'
-                  : 'text-ink-400 hover:text-white'
-              }`}
-            >
-              Back
-            </button>
-          </div>
-
-          <div className="relative">
-            {/* Ambient glow behind body */}
-            <div
-              className="absolute inset-0 blur-3xl opacity-30 pointer-events-none"
-              style={{
-                background:
-                  'radial-gradient(circle at 50% 40%, rgba(198,255,61,0.35), transparent 60%)',
-              }}
+      <div className="card p-4 space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
+            <input
+              className="input pl-9"
+              placeholder="Tìm bài tập (vd: bench, squat, curl)..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
             />
-            <svg
-              viewBox="0 0 200 400"
-              width="240"
-              height="480"
-              className="relative shrink-0 select-none"
-              style={{ overflow: 'visible' }}
-            >
-              <defs>
-                {/* Gradients cho recovery states */}
-                <linearGradient id="gradDead" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#b32d2d" />
-                  <stop offset="100%" stopColor="#5c0e0e" />
-                </linearGradient>
-                <linearGradient id="gradFatigued" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ff7272" />
-                  <stop offset="100%" stopColor="#c93a3a" />
-                </linearGradient>
-                <linearGradient id="gradMid" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ffa05c" />
-                  <stop offset="100%" stopColor="#e07a30" />
-                </linearGradient>
-                <linearGradient id="gradAlmost" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ffd066" />
-                  <stop offset="100%" stopColor="#ffa500" />
-                </linearGradient>
-                <linearGradient id="gradReady" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#dcff70" />
-                  <stop offset="100%" stopColor="#9bd82f" />
-                </linearGradient>
-                <filter id="glowActive" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-                <filter id="bodyShadow">
-                  <feGaussianBlur stdDeviation="2" />
-                </filter>
-                <style>{`
-                  .body-outline { fill: #1a1f28; stroke: #2f3743; stroke-width: 1; }
-                  .muscle-label { font-size: 7px; fill: #0b0c0e; font-weight: 800; text-anchor: middle; pointer-events: none; }
-                  .muscle-label-light { font-size: 7px; fill: #ffffff; font-weight: 800; text-anchor: middle; pointer-events: none; }
-                  .muscle { transition: opacity 220ms ease, filter 220ms ease; }
-                `}</style>
-              </defs>
-
-              {/* Body silhouette base */}
-              <BodyBase view={view} />
-
-              {view === 'front' && <FrontView handlers={handlers} labelText={labelText} />}
-              {view === 'side' && <SideView handlers={handlers} labelText={labelText} />}
-              {view === 'back' && <BackView handlers={handlers} labelText={labelText} />}
-
-              {/* View label */}
-              <text
-                x="100"
-                y="385"
-                textAnchor="middle"
-                fontSize="9"
-                fontWeight="700"
-                fill="#8a93a0"
-                letterSpacing="2"
-              >
-                {view.toUpperCase()}
-              </text>
-            </svg>
           </div>
+          <button
+            className={`btn btn-ghost ${showFilters ? 'border-accent text-accent' : ''}`}
+            onClick={() => setShowFilters((v) => !v)}
+          >
+            <Filter className="w-4 h-4" /> Filters
+          </button>
+        </div>
 
-          {/* Progress hint */}
-          {groupsByStatus.recovering.length > 0 && (
-            <div className="text-[11px] text-ink-400 text-center max-w-[240px]">
-              Next ready:{' '}
-              <span className="text-accent">
-                {LABELS[
-                  [...groupsByStatus.recovering].sort(
-                    (a, b) => (a.hoursRemaining || 99) - (b.hoursRemaining || 99)
-                  )[0]?.muscleGroup
-                ]}
-              </span>{' '}
-              in{' '}
-              {fmtHours(
-                [...groupsByStatus.recovering].sort(
-                  (a, b) => (a.hoursRemaining || 99) - (b.hoursRemaining || 99)
-                )[0]?.hoursRemaining
+        {showFilters && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-ink-700">
+            <div>
+              <label className="label">Body Part</label>
+              <select className="input" value={bodyPart} onChange={(e) => setBodyPart(e.target.value)}>
+                <option value="">All</option>
+                {(facets.data?.bodyParts || []).map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Equipment</label>
+              <select className="input" value={equipment} onChange={(e) => setEquipment(e.target.value)}>
+                <option value="">All</option>
+                {(facets.data?.equipments || []).map((e) => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Difficulty</label>
+              <select className="input" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                <option value="">All</option>
+                {(facets.data?.difficulties || []).map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Category</label>
+              <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option value="">All</option>
+                {(facets.data?.categories || []).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2 md:col-span-4">
+              <label className="label">Muscle</label>
+              <select className="input" value={muscleSlug} onChange={(e) => setMuscleSlug(e.target.value)}>
+                <option value="">All</option>
+                {(facets.data?.muscleSlugs || []).map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            {hasFilters && (
+              <button
+                className="btn btn-ghost text-xs col-span-2 md:col-span-4 justify-center"
+                onClick={clearFilters}
+              >
+                <X className="w-3 h-3" /> Clear filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <Skeleton key={i} className="h-44" />
+          ))}
+        </div>
+      ) : exercises.length ? (
+        <>
+          <div className="text-xs text-ink-400">
+            Hiện {exercises.length} / {total} bài tập
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {exercises.map((ex) => (
+              <button
+                key={ex.id}
+                onClick={() => setDetail(ex)}
+                className="card p-3 space-y-2 text-left hover:border-accent/50 transition-colors"
+              >
+                <div className="font-medium text-sm line-clamp-2 min-h-[2.4em]">
+                  {ex.name}
+                </div>
+
+                {ex.primaryMuscles?.length > 0 && (
+                  <div className="text-xs text-accent line-clamp-1 flex items-center gap-1">
+                    <Activity className="w-3 h-3 shrink-0" />
+                    <span>{ex.primaryMuscles.slice(0, 2).join(', ')}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-1">
+                  {ex.equipment && (
+                    <span className="chip text-[10px]">{ex.equipment}</span>
+                  )}
+                  {ex.difficulty && (
+                    <span className="chip text-[10px]">{ex.difficulty}</span>
+                  )}
+                  {ex.mechanic && (
+                    <span className="chip text-[10px]">{ex.mechanic}</span>
+                  )}
+                </div>
+
+                {ex.videoUrl && (
+                  <div className="text-[10px] text-ink-500 flex items-center gap-1">
+                    <Play className="w-3 h-3" /> Video
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <Empty title="Không tìm thấy bài tập" hint="Thử đổi từ khoá hoặc filter." />
+      )}
+
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.name || ''}
+        wide
+      >
+        {detail && <ExerciseDetailContent ex={detail} />}
+      </Modal>
+    </div>
+  );
+}
+
+function ExerciseDetailContent({ ex }) {
+  const anatomeUrl = buildAnatomeUrl(ex);
+  const [showMap, setShowMap] = useState(false);
+  const [mapError, setMapError] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {ex.equipment && <span className="chip">{ex.equipment}</span>}
+        {ex.difficulty && <span className="chip">{ex.difficulty}</span>}
+        {ex.category && <span className="chip">{ex.category}</span>}
+        {ex.mechanic && <span className="chip">{ex.mechanic}</span>}
+        {ex.force && <span className="chip">{ex.force}</span>}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {ex.primaryMuscles?.length > 0 && (
+          <div>
+            <div className="label">Primary Muscles</div>
+            <div className="text-sm text-accent">
+              {ex.primaryMuscles.join(', ')}
+            </div>
+          </div>
+        )}
+        {ex.secondaryMuscles?.length > 0 && (
+          <div>
+            <div className="label">Secondary</div>
+            <div className="text-sm text-ink-300">
+              {ex.secondaryMuscles.join(', ')}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {anatomeUrl && (
+        <div>
+          <button
+            className="btn btn-ghost w-full justify-center"
+            onClick={() => setShowMap((v) => !v)}
+          >
+            <Activity className="w-4 h-4" />
+            {showMap ? 'Hide' : 'Show'} Muscle Map
+          </button>
+          {showMap && (
+            <div className="mt-3 flex justify-center bg-ink-950 rounded-xl p-4 min-h-[420px]">
+              {mapError ? (
+                <div className="text-xs text-red-400 self-center">
+                  Muscle map unavailable (Anatome API offline)
+                </div>
+              ) : (
+                <img
+                  src={anatomeUrl}
+                  alt="Muscle map"
+                  width={280}
+                  height={420}
+                  className="max-w-full"
+                  onError={() => setMapError(true)}
+                />
               )}
             </div>
           )}
         </div>
+      )}
 
-        {/* Detail panel */}
-        <div className="space-y-4 min-w-0">
-          {/* Active detail card */}
-          <div
-            className="border rounded-xl p-4 transition-all duration-200 relative overflow-hidden"
-            style={{
-              borderColor: active
-                ? recoverySolid(activeData?.percent || 0, activeNever) + '66'
-                : '#262c35',
-              background: active
-                ? `linear-gradient(135deg, ${recoverySolid(
-                    activeData?.percent || 0,
-                    activeNever
-                  )}11, transparent 60%)`
-                : 'transparent',
-            }}
+      {ex.videoUrl && (
+        <div>
+          <div className="label">Video</div>
+          <a
+            href={ex.videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost w-full justify-center"
           >
-            {active && activeData ? (
-              <>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="font-semibold text-lg">
-                      {LABELS[active] || active}
-                    </div>
-                    <div className="text-xs text-ink-400">
-                      {activeNever
-                        ? 'Never trained'
-                        : `Last: ${fmtHours(activeData.hoursSince)} ago`}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div
-                      className="text-3xl font-bold tabular-nums"
-                      style={{
-                        color: recoverySolid(
-                          activeData.percent,
-                          activeNever
-                        ),
-                      }}
-                    >
-                      {activeNever ? '—' : `${activeData.percent}%`}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wide text-ink-400">
-                      recovered
-                    </div>
-                  </div>
-                </div>
-
-                <div className="h-2.5 bg-ink-800 rounded-full overflow-hidden mb-4">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${activeNever ? 0 : activeData.percent}%`,
-                      background: `linear-gradient(90deg, ${recoverySolid(
-                        activeData.percent,
-                        activeNever
-                      )}aa, ${recoverySolid(activeData.percent, activeNever)})`,
-                      boxShadow: `0 0 12px ${recoverySolid(
-                        activeData.percent,
-                        activeNever
-                      )}66`,
-                    }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Stat mini label="Sets 7d" value={activeData.sets7d} />
-                  <Stat mini label="Sets 30d" value={activeData.sets30d} />
-                  <Stat
-                    mini
-                    label="Volume 7d"
-                    value={`${fmtNumber((activeData.volume7d || 0) / 1000, 1)}t`}
-                  />
-                  <Stat
-                    mini
-                    label="Volume 30d"
-                    value={`${fmtNumber((activeData.volume30d || 0) / 1000, 1)}t`}
-                  />
-                </div>
-
-                {!activeNever && activeData.percent < 100 && (
-                  <div className="mt-3 text-xs flex items-center gap-2 text-ink-400">
-                    <Info className="w-3 h-3" />
-                    Ready in{' '}
-                    <span className="text-white font-medium">
-                      {fmtHours(activeData.hoursRemaining)}
-                    </span>
-                  </div>
-                )}
-                {!activeNever && activeData.percent >= 100 && (
-                  <div className="mt-3 text-xs flex items-center gap-2 text-accent">
-                    <Info className="w-3 h-3" />
-                    Fully recovered — ready to train
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center gap-3 text-ink-400 text-sm">
-                <Info className="w-4 h-4 shrink-0" />
-                <span>
-                  Hover hoặc chạm vào một vùng cơ trên hình để xem chi tiết
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Status groups */}
-          {groupsByStatus.fatigued.length > 0 && (
-            <StatusGroup
-              title="Fatigued"
-              color="#ff5e5e"
-              items={groupsByStatus.fatigued}
-              get={get}
-              active={active}
-              setHovered={setHovered}
-              setSelected={setSelected}
-            />
-          )}
-
-          {groupsByStatus.recovering.length > 0 && (
-            <StatusGroup
-              title="Recovering"
-              color="#ffb038"
-              items={groupsByStatus.recovering}
-              get={get}
-              active={active}
-              setHovered={setHovered}
-              setSelected={setSelected}
-            />
-          )}
-
-          {groupsByStatus.ready.length > 0 && (
-            <StatusGroup
-              title="Ready"
-              color="#c6ff3d"
-              items={groupsByStatus.ready}
-              get={get}
-              active={active}
-              setHovered={setHovered}
-              setSelected={setSelected}
-            />
-          )}
-
-          {groupsByStatus.never.length > 0 && (
-            <StatusGroup
-              title="Never trained"
-              color="#5a6470"
-              items={groupsByStatus.never}
-              get={get}
-              active={active}
-              setHovered={setHovered}
-              setSelected={setSelected}
-            />
-          )}
+            <Play className="w-4 h-4" /> Watch on YouTube
+          </a>
         </div>
-      </div>
+      )}
+
+      {ex.instructions?.length > 0 && (
+        <div>
+          <div className="label">Instructions</div>
+          <ol className="list-decimal ml-5 text-sm text-ink-300 space-y-1">
+            {ex.instructions.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {ex.keywords?.length > 0 && (
+        <div>
+          <div className="label">Keywords</div>
+          <div className="flex flex-wrap gap-1">
+            {ex.keywords.slice(0, 20).map((k, i) => (
+              <span key={i} className="chip text-[10px]">{k}</span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-  );
-}
-
-// ============================================================
-// Sub-components
-// ============================================================
-
-function Stat({ label, value, mini }) {
-  return (
-    <div className={mini ? '' : 'card p-3'}>
-      <div className="text-[10px] uppercase tracking-wide text-ink-400">
-        {label}
-      </div>
-      <div className="font-semibold text-sm mt-0.5">{value ?? 0}</div>
-    </div>
-  );
-}
-
-function StatusGroup({ title, color, items, get, active, setHovered, setSelected }) {
-  if (!items.length) return null;
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{ background: color, boxShadow: `0 0 8px ${color}` }}
-        />
-        <span className="text-xs uppercase tracking-wide text-ink-400">
-          {title} · {items.length}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((r) => {
-          const isActive = active === r.muscleGroup;
-          return (
-            <button
-              key={r.muscleGroup}
-              className={`px-2.5 py-1 rounded-full text-xs border transition-all duration-150 ${
-                isActive
-                  ? 'border-accent bg-accent/10 text-white'
-                  : 'border-ink-700 hover:border-ink-500 text-ink-300'
-              }`}
-              onMouseEnter={() => setHovered(r.muscleGroup)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() =>
-                setSelected((s) => (s === r.muscleGroup ? null : r.muscleGroup))
-              }
-            >
-              <span className="font-medium">{LABELS[r.muscleGroup]}</span>
-              <span className="ml-1.5 opacity-60">{r.percent}%</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// SVG Body parts
-// ============================================================
-
-function BodyBase({ view }) {
-  if (view === 'side') {
-    return (
-      <g className="body-outline">
-        {/* Head */}
-        <ellipse cx="100" cy="28" rx="16" ry="20" />
-        {/* Neck */}
-        <rect x="92" y="46" width="16" height="12" rx="3" />
-        {/* Torso side */}
-        <path d="M 86 58 Q 76 62 74 80 L 72 130 Q 70 160 76 175 L 124 175 Q 130 160 128 130 L 126 80 Q 124 62 114 58 Z" />
-        {/* Arm hanging */}
-        <path d="M 76 66 Q 68 70 68 86 L 72 130 Q 76 132 80 126 L 82 80 Q 82 68 78 66 Z" />
-        {/* Leg */}
-        <path d="M 84 178 L 116 178 L 112 250 L 120 320 Q 116 330 108 328 L 100 260 L 92 328 Q 84 330 80 320 L 88 250 Z" />
-      </g>
-    );
-  }
-  return (
-    <g className="body-outline">
-      {/* Head */}
-      <ellipse cx="100" cy="30" rx="18" ry="22" />
-      {/* Neck */}
-      <rect x="92" y="50" width="16" height="14" rx="3" />
-      {/* Torso */}
-      <path d="M 78 66 Q 68 68 66 88 L 66 175 Q 66 195 78 200 L 122 200 Q 134 195 134 175 L 134 88 Q 132 68 122 66 Z" />
-      {/* Arms */}
-      <path d="M 62 80 Q 52 86 52 100 L 56 170 Q 60 178 68 176 L 70 96 Q 70 84 64 80 Z" />
-      <path d="M 138 80 Q 148 86 148 100 L 144 170 Q 140 178 132 176 L 130 96 Q 130 84 136 80 Z" />
-      {/* Legs */}
-      <path d="M 78 202 L 98 202 L 96 290 L 82 290 Z" />
-      <path d="M 102 202 L 122 202 L 118 290 L 104 290 Z" />
-      {/* Feet */}
-      <path d="M 82 292 L 96 292 L 96 315 Q 88 322 80 315 Z" />
-      <path d="M 104 292 L 118 292 L 120 315 Q 112 322 104 315 Z" />
-    </g>
-  );
-}
-
-function FrontView({ handlers, labelText }) {
-  return (
-    <g>
-      {/* Neck */}
-      <rect x="94" y="50" width="12" height="14" rx="2" className="muscle" {...handlers('neck')} />
-      <text className="muscle-label" x="100" y="60">{labelText('neck')}</text>
-
-      {/* Traps (front visible) */}
-      <path d="M 82 66 Q 92 62 100 62 Q 108 62 118 66 L 116 78 Q 108 76 100 76 Q 92 76 84 78 Z"
-        className="muscle" {...handlers('traps')} />
-
-      {/* Front delts */}
-      <ellipse cx="76" cy="82" rx="10" ry="12" className="muscle" {...handlers('front_delt')} />
-      <ellipse cx="124" cy="82" rx="10" ry="12" className="muscle" {...handlers('front_delt')} />
-      <text className="muscle-label" x="76" y="85">{labelText('front_delt')}</text>
-
-      {/* Side delts */}
-      <path d="M 68 76 Q 62 80 62 92 Q 62 100 68 102 L 70 88 Z"
-        className="muscle" {...handlers('side_delt')} />
-      <path d="M 132 76 Q 138 80 138 92 Q 138 100 132 102 L 130 88 Z"
-        className="muscle" {...handlers('side_delt')} />
-
-      {/* Upper chest */}
-      <path d="M 84 78 Q 92 76 100 76 Q 108 76 116 78 L 114 96 Q 108 100 100 100 Q 92 100 86 96 Z"
-        className="muscle" {...handlers('upper_chest')} />
-      <text className="muscle-label" x="100" y="92">{labelText('upper_chest')}</text>
-
-      {/* Mid chest */}
-      <path d="M 86 98 L 114 98 L 112 120 Q 106 126 100 126 Q 94 126 88 120 Z"
-        className="muscle" {...handlers('chest')} />
-      <text className="muscle-label" x="100" y="114">{labelText('chest')}</text>
-
-      {/* Biceps */}
-      <ellipse cx="62" cy="130" rx="8" ry="18" className="muscle" {...handlers('biceps')} />
-      <ellipse cx="138" cy="130" rx="8" ry="18" className="muscle" {...handlers('biceps')} />
-      <text className="muscle-label" x="62" y="134">{labelText('biceps')}</text>
-
-      {/* Forearms */}
-      <ellipse cx="58" cy="168" rx="7" ry="20" className="muscle" {...handlers('forearms')} />
-      <ellipse cx="142" cy="168" rx="7" ry="20" className="muscle" {...handlers('forearms')} />
-      <text className="muscle-label" x="58" y="172">{labelText('forearms')}</text>
-
-      {/* Abs */}
-      <rect x="88" y="130" width="24" height="42" rx="3" className="muscle" {...handlers('abs')} />
-      <text className="muscle-label" x="100" y="154">{labelText('abs')}</text>
-
-      {/* Obliques */}
-      <path d="M 84 130 L 84 172 L 78 168 L 78 132 Z" className="muscle" {...handlers('obliques')} />
-      <path d="M 116 130 L 116 172 L 122 168 L 122 132 Z" className="muscle" {...handlers('obliques')} />
-
-      {/* Quads */}
-      <path d="M 82 202 L 96 202 L 94 262 L 84 262 Z" className="muscle" {...handlers('quads')} />
-      <path d="M 104 202 L 118 202 L 116 262 L 106 262 Z" className="muscle" {...handlers('quads')} />
-      <text className="muscle-label" x="100" y="235">{labelText('quads')}</text>
-
-      {/* Calves */}
-      <path d="M 84 265 L 94 265 L 94 300 L 84 300 Z" className="muscle" {...handlers('calves')} />
-      <path d="M 106 265 L 116 265 L 116 300 L 106 300 Z" className="muscle" {...handlers('calves')} />
-      <text className="muscle-label" x="100" y="285">{labelText('calves')}</text>
-    </g>
-  );
-}
-
-function SideView({ handlers, labelText }) {
-  return (
-    <g>
-      {/* Neck (side) */}
-      <rect x="92" y="50" width="16" height="14" rx="2" className="muscle" {...handlers('neck')} />
-      <text className="muscle-label" x="100" y="60">{labelText('neck')}</text>
-
-      {/* Traps (side) */}
-      <path d="M 88 66 Q 96 62 100 62 L 112 70 L 108 84 Q 100 80 92 82 Z"
-        className="muscle" {...handlers('traps')} />
-
-      {/* Front delt (side) */}
-      <ellipse cx="82" cy="88" rx="9" ry="11" className="muscle" {...handlers('front_delt')} />
-      <text className="muscle-label" x="82" y="90">{labelText('front_delt')}</text>
-
-      {/* Side delt (side) — prominent */}
-      <ellipse cx="90" cy="84" rx="8" ry="10" className="muscle" {...handlers('side_delt')} />
-      <text className="muscle-label" x="92" y="80">{labelText('side_delt')}</text>
-
-      {/* Rear delt (side) */}
-      <ellipse cx="98" cy="90" rx="7" ry="9" className="muscle" {...handlers('rear_delt')} />
-
-      {/* Chest (side profile) */}
-      <path d="M 74 96 Q 84 92 92 98 L 90 118 Q 82 122 76 118 Z"
-        className="muscle" {...handlers('chest')} />
-      <text className="muscle-label" x="82" y="110">{labelText('chest')}</text>
-
-      {/* Lats (side) */}
-      <path d="M 92 98 Q 104 104 108 120 L 104 138 L 96 136 Q 94 118 92 108 Z"
-        className="muscle" {...handlers('lats')} />
-      <text className="muscle-label" x="102" y="122">{labelText('lats')}</text>
-
-      {/* Biceps (side) */}
-      <ellipse cx="76" cy="118" rx="7" ry="16" className="muscle" {...handlers('biceps')} />
-
-      {/* Triceps (side) */}
-      <ellipse cx="94" cy="122" rx="7" ry="16" className="muscle" {...handlers('triceps')} />
-
-      {/* Forearms */}
-      <ellipse cx="76" cy="150" rx="6" ry="16" className="muscle" {...handlers('forearms')} />
-
-      {/* Abs (side) */}
-      <path d="M 84 122 L 96 122 L 94 156 L 86 156 Z"
-        className="muscle" {...handlers('abs')} />
-      <text className="muscle-label" x="90" y="142">{labelText('abs')}</text>
-
-      {/* Lower back (side) */}
-      <path d="M 96 138 L 110 140 L 108 168 L 96 166 Z"
-        className="muscle" {...handlers('lower_back')} />
-
-      {/* Glutes (side profile) */}
-      <path d="M 96 178 Q 116 174 122 186 Q 122 200 106 204 L 92 202 Z"
-        className="muscle" {...handlers('glutes')} />
-      <text className="muscle-label" x="108" y="192">{labelText('glutes')}</text>
-
-      {/* Quads (side) */}
-      <path d="M 84 206 L 100 206 L 98 262 L 86 262 Z"
-        className="muscle" {...handlers('quads')} />
-      <text className="muscle-label" x="92" y="238">{labelText('quads')}</text>
-
-      {/* Hamstrings (side) */}
-      <path d="M 100 206 L 116 206 L 114 262 L 104 262 Z"
-        className="muscle" {...handlers('hamstrings')} />
-      <text className="muscle-label" x="108" y="238">{labelText('hamstrings')}</text>
-
-      {/* Calves (side) */}
-      <path d="M 88 268 L 116 268 L 114 302 L 90 302 Z"
-        className="muscle" {...handlers('calves')} />
-      <text className="muscle-label" x="102" y="288">{labelText('calves')}</text>
-    </g>
-  );
-}
-
-function BackView({ handlers, labelText }) {
-  return (
-    <g>
-      {/* Neck */}
-      <rect x="94" y="50" width="12" height="14" rx="2" className="muscle" {...handlers('neck')} />
-      <text className="muscle-label" x="100" y="60">{labelText('neck')}</text>
-
-      {/* Traps (full) */}
-      <path d="M 82 66 Q 100 58 118 66 L 114 88 Q 108 84 100 84 Q 92 84 86 88 Z"
-        className="muscle" {...handlers('traps')} />
-      <text className="muscle-label" x="100" y="78">{labelText('traps')}</text>
-
-      {/* Rear delts */}
-      <ellipse cx="74" cy="96" rx="10" ry="10" className="muscle" {...handlers('rear_delt')} />
-      <ellipse cx="126" cy="96" rx="10" ry="10" className="muscle" {...handlers('rear_delt')} />
-      <text className="muscle-label" x="74" y="99">{labelText('rear_delt')}</text>
-
-      {/* Side delts (back visible) */}
-      <path d="M 66 90 Q 60 94 60 104 L 64 108 L 68 98 Z" className="muscle" {...handlers('side_delt')} />
-      <path d="M 134 90 Q 140 94 140 104 L 136 108 L 132 98 Z" className="muscle" {...handlers('side_delt')} />
-
-      {/* Lats (2 wings) */}
-      <path d="M 82 92 Q 76 108 80 138 L 96 138 L 98 96 Q 90 92 82 92 Z"
-        className="muscle" {...handlers('lats')} />
-      <path d="M 118 92 Q 124 108 120 138 L 104 138 L 102 96 Q 110 92 118 92 Z"
-        className="muscle" {...handlers('lats')} />
-      <text className="muscle-label" x="88" y="118">{labelText('lats')}</text>
-      <text className="muscle-label" x="112" y="118">{labelText('lats')}</text>
-
-      {/* Middle back */}
-      <rect x="94" y="88" width="12" height="52" rx="2" className="muscle" {...handlers('middle_back')} />
-      <text className="muscle-label" x="100" y="118">{labelText('middle_back')}</text>
-
-      {/* Lower back */}
-      <rect x="94" y="142" width="12" height="30" rx="2" className="muscle" {...handlers('lower_back')} />
-      <text className="muscle-label" x="100" y="160">{labelText('lower_back')}</text>
-
-      {/* Triceps */}
-      <ellipse cx="58" cy="132" rx="8" ry="20" className="muscle" {...handlers('triceps')} />
-      <ellipse cx="142" cy="132" rx="8" ry="20" className="muscle" {...handlers('triceps')} />
-      <text className="muscle-label" x="58" y="136">{labelText('triceps')}</text>
-
-      {/* Forearms */}
-      <ellipse cx="56" cy="172" rx="7" ry="18" className="muscle" {...handlers('forearms')} />
-
-      {/* Glutes */}
-      <path d="M 80 178 Q 100 172 120 178 Q 122 200 100 204 Q 78 200 80 178 Z"
-        className="muscle" {...handlers('glutes')} />
-      <text className="muscle-label" x="100" y="194">{labelText('glutes')}</text>
-
-      {/* Hamstrings */}
-      <path d="M 82 208 L 96 208 L 94 262 L 84 262 Z" className="muscle" {...handlers('hamstrings')} />
-      <path d="M 104 208 L 118 208 L 116 262 L 106 262 Z" className="muscle" {...handlers('hamstrings')} />
-      <text className="muscle-label" x="100" y="238">{labelText('hamstrings')}</text>
-
-      {/* Calves */}
-      <path d="M 84 268 L 94 268 L 94 302 L 84 302 Z" className="muscle" {...handlers('calves')} />
-      <path d="M 106 268 L 116 268 L 116 302 L 106 302 Z" className="muscle" {...handlers('calves')} />
-      <text className="muscle-label" x="100" y="288">{labelText('calves')}</text>
-    </g>
   );
 }
 EOF
-echo "✅ client/src/components/MuscleRecoveryMap.jsx"
+echo "✅ client/src/pages/AnatomeLibrary.jsx"
 
 echo ""
 echo "=============================================="
-echo "✅ FEATURE 9 hoàn tất — Recovery map redesign"
+echo "✅ FEATURE 12 — Flatten + UI Library hoàn tất"
 echo "=============================================="
 echo ""
-echo "Deploy:"
-echo "  cd ~/Code/tgr"
- git add .
-git commit -m 'Feature 9: Recovery map redesign + side view'
+echo "BƯỚC TIẾP THEO:"
+echo ""
+echo "  1. Chạy sync lại (flatten):"
+echo "     cd ~/Code/tgr"
+echo "     node server/scripts/sync-anatome-exercises.js"
+node server/scripts/sync-anatome-exercises.js
+echo ""
+echo "  2. Verify:"
+echo "     jq '.exercises | length' server/public/anatome-exercises.json"
+echo "     ls -lh server/public/anatome-exercises.json"
+echo "     jq '.exercises[0]' server/public/anatome-exercises.json"
+echo ""
+echo "  3. Commit + push:"
+git add .
+git commit -m 'Feature 12: Flatten anatome JSON + redesigned library'
 git push
 echo ""

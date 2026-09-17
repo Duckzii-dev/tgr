@@ -20,6 +20,7 @@ import profileRoutes from './routes/profile.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import strengthRoutes from './routes/strength.routes.js';
 import landmarkRoutes from './routes/landmark.routes.js';
+import anatomeRoutes from './routes/anatome.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { issueCsrfToken, verifyCsrf } from './middleware/csrf.middleware.js';
 import { ipBlockGuard, getClientIp } from './middleware/ipblock.middleware.js';
@@ -61,6 +62,7 @@ app.use(
           "'self'",
           "https://challenges.cloudflare.com",
           "https://*.cloudflare.com",
+          "https://api.anatome.dev",
         ],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         mediaSrc: ["'self'", "data:", "blob:", "https:"],
@@ -124,6 +126,7 @@ app.use('/api/goals', verifyCsrf, goalRoutes);
 app.use('/api/profile', verifyCsrf, profileRoutes);
 app.use('/api/strength', verifyCsrf, strengthRoutes);
 app.use('/api/landmarks', verifyCsrf, landmarkRoutes);
+app.use('/api/anatome', verifyCsrf, anatomeRoutes);
 
 const clientDist = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
