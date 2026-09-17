@@ -12,14 +12,19 @@ prisma_exec() {
 pre_clean() {
   echo "[entrypoint] Pre-cleaning partial migrations..."
 
+  # Migration 20260916010000_add_finished_at_and_pr_workout
   prisma_exec "DROP INDEX \`Workout_finishedAt_idx\` ON \`Workout\`;"
   prisma_exec "ALTER TABLE \`PersonalRecord\` DROP FOREIGN KEY \`PersonalRecord_workoutId_fkey\`;"
   prisma_exec "DROP INDEX \`PersonalRecord_workoutId_idx\` ON \`PersonalRecord\`;"
   prisma_exec "DROP INDEX \`PersonalRecord_userId_exerciseId_type_key\` ON \`PersonalRecord\`;"
+  prisma_exec "DROP INDEX \`PersonalRecord_userId_idx\` ON \`PersonalRecord\`;"
+  prisma_exec "DROP INDEX \`PersonalRecord_exerciseId_idx\` ON \`PersonalRecord\`;"
+  prisma_exec "DROP INDEX \`PersonalRecord_achievedAt_idx\` ON \`PersonalRecord\`;"
   prisma_exec "ALTER TABLE \`Workout\` DROP COLUMN \`finishedAt\`;"
   prisma_exec "ALTER TABLE \`User\` DROP COLUMN \`timezone\`;"
   prisma_exec "ALTER TABLE \`PersonalRecord\` DROP COLUMN \`workoutId\`;"
 
+  # Migration 20260916020000_add_admin_role_ipblock_auditlog
   prisma_exec "ALTER TABLE \`User\` DROP COLUMN \`role\`;"
   prisma_exec "ALTER TABLE \`User\` DROP COLUMN \`isBanned\`;"
   prisma_exec "ALTER TABLE \`User\` DROP COLUMN \`bannedAt\`;"
@@ -63,6 +68,6 @@ else
       echo "[entrypoint] WARNING: migrate deploy still failing."
   fi
 fi
-
+echo "DUYDEPTRAISIEUBAKHI"
 echo "[entrypoint] Starting server..."
 exec node src/index.js
