@@ -293,7 +293,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
         <div className="space-y-4 min-w-0">
           {/* Active detail */}
           <div
-            className="border rounded-xl p-4 transition-all duration-200 relative overflow-hidden"
+            className="border rounded-xl p-4 transition-all duration-200 relative overflow-hidden min-h-[260px]"
             style={{
               borderColor: active
                 ? recoverySolid(activeData?.percent || 0, activeNever) + '66'
@@ -382,7 +382,8 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
             )}
           </div>
 
-          {/* Status groups */}
+          {/* Status groups — fixed grid để không shift */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { key: 'cooked', color: '#8a1f1f', title: 'Cooked' },
             { key: 'fatigued', color: '#ff5e5e', title: 'Fatigued' },
@@ -405,6 +406,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
               />
             );
           })}
+          </div>
         </div>
       </div>
     </div>
@@ -423,7 +425,7 @@ function Stat({ label, value }) {
 function StatusGroup({ title, color, items, active, setHovered, setSelected }) {
   if (!items.length) return null;
   return (
-    <div>
+    <div className="border border-ink-700 rounded-lg p-3 min-h-[80px]">
       <div className="flex items-center gap-2 mb-2">
         <span
           className="w-2 h-2 rounded-full"
