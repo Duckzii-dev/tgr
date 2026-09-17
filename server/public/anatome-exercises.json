@@ -1,18 +1,18 @@
 {
   "_meta": {
-    "source": "detailed-classification-v6",
-    "generatedAt": "2026-09-17T08:54:41.584Z",
+    "source": "detailed-classification-v7",
+    "generatedAt": "2026-09-17T08:56:41.377Z",
     "totalExercises": 879,
     "byGroup": {
       "core": 84,
       "cardio": 23,
       "stretch": 57,
-      "back": 149,
-      "chest": 146,
-      "shoulders": 95,
+      "back": 144,
+      "chest": 127,
+      "shoulders": 93,
       "legs": 121,
-      "triceps": 69,
-      "biceps": 95,
+      "triceps": 87,
+      "biceps": 103,
       "forearms": 18,
       "other": 22
     },
@@ -20,25 +20,25 @@
       "abs": 70,
       "cardio": 23,
       "mobility": 57,
-      "lats": 54,
-      "chest": 125,
-      "front-delts": 62,
-      "side-delts": 72,
-      "middle-back": 60,
+      "lats": 50,
+      "chest": 109,
+      "front-delts": 61,
+      "side-delts": 71,
+      "middle-back": 59,
       "obliques": 14,
       "hamstrings": 5,
-      "triceps": 93,
-      "lower-back": 29,
-      "biceps": 95,
+      "triceps": 98,
+      "lower-back": 28,
+      "biceps": 103,
       "glutes": 12,
       "quadriceps": 63,
       "rear-delts": 12,
       "forearms": 18,
       "traps": 20,
       "calves": 45,
-      "upper-chest": 21,
-      "neck": 2,
-      "other": 22
+      "upper-chest": 18,
+      "other": 22,
+      "neck": 1
     }
   },
   "exercises": [
@@ -168,7 +168,7 @@
     },
     {
       "id": "Arms_Overhead_Full_Sit-Up_Male",
-      "name": "Arms Overhead Full Sit-Up Male",
+      "name": "Arms Overhead Full Sit-Up",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -469,13 +469,11 @@
     {
       "id": "Assisted_Triceps_Dip_Kneeling",
       "name": "Assisted Triceps Dip Kneeling",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -500,7 +498,7 @@
     },
     {
       "id": "Astride_Jumps_Male",
-      "name": "Astride Jumps Male",
+      "name": "Astride Jumps",
       "bodyPart": "cardio",
       "muscleSlugs": [
         "cardio"
@@ -1209,7 +1207,7 @@
     },
     {
       "id": "Band_Two_Legs_Calf_Raise_-_Band_Under_Both_Legs_V_2",
-      "name": "Band Two Legs Calf Raise - Band Under Both Legs V 2",
+      "name": "Band Two Legs Calf Raise - Band Under Both Legs",
       "bodyPart": "legs",
       "muscleSlugs": [
         "calves"
@@ -1426,12 +1424,12 @@
     {
       "id": "Barbell_Close-Grip_Bench_Press",
       "name": "Barbell Close-Grip Bench Press",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest"
+        "triceps"
       ],
       "primaryMuscles": [
-        "Chest"
+        "Triceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -1731,7 +1729,7 @@
     },
     {
       "id": "Barbell_Glute_Bridge_Two_Legs_On_Bench_Male",
-      "name": "Barbell Glute Bridge Two Legs On Bench Male",
+      "name": "Barbell Glute Bridge Two Legs On Bench",
       "bodyPart": "legs",
       "muscleSlugs": [
         "glutes"
@@ -1807,12 +1805,12 @@
     {
       "id": "Barbell_Incline_Close_Grip_Bench_Press",
       "name": "Barbell Incline Close Grip Bench Press",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest"
+        "triceps"
       ],
       "primaryMuscles": [
-        "Chest"
+        "Triceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -2352,7 +2350,7 @@
     },
     {
       "id": "Barbell_Rear_Lunge_V_2",
-      "name": "Barbell Rear Lunge V 2",
+      "name": "Barbell Rear Lunge",
       "bodyPart": "legs",
       "muscleSlugs": [
         "quadriceps"
@@ -2367,7 +2365,7 @@
     },
     {
       "id": "Barbell_Revers_Wrist_Curl_V_2",
-      "name": "Barbell Revers Wrist Curl V 2",
+      "name": "Barbell Revers Wrist Curl",
       "bodyPart": "forearms",
       "muscleSlugs": [
         "forearms"
@@ -2383,12 +2381,12 @@
     {
       "id": "Barbell_Reverse_Close-Grip_Bench_Press",
       "name": "Barbell Reverse Close-Grip Bench Press",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest"
+        "triceps"
       ],
       "primaryMuscles": [
-        "Chest"
+        "Triceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -2596,7 +2594,7 @@
     },
     {
       "id": "Barbell_Seated_Calf_Raise_1371",
-      "name": "Barbell Seated Calf Raise 1371",
+      "name": "Barbell Seated Calf Raise",
       "bodyPart": "legs",
       "muscleSlugs": [
         "calves"
@@ -2612,12 +2610,12 @@
     {
       "id": "Barbell_Seated_Close_Grip_Behind_Neck_Triceps_Extension",
       "name": "Barbell Seated Close Grip Behind Neck Triceps Extension",
-      "bodyPart": "shoulders",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "neck"
+        "triceps"
       ],
       "primaryMuscles": [
-        "Neck"
+        "Triceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -2703,7 +2701,7 @@
     },
     {
       "id": "Barbell_Side_Split_Squat_V_2",
-      "name": "Barbell Side Split Squat V 2",
+      "name": "Barbell Side Split Squat",
       "bodyPart": "legs",
       "muscleSlugs": [
         "quadriceps"
@@ -2763,7 +2761,7 @@
     },
     {
       "id": "Barbell_Sitted_Alternate_Leg_Raise_Female",
-      "name": "Barbell Sitted Alternate Leg Raise Female",
+      "name": "Barbell Sitted Alternate Leg Raise",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -2793,7 +2791,7 @@
     },
     {
       "id": "Barbell_Split_Squat_V_2",
-      "name": "Barbell Split Squat V 2",
+      "name": "Barbell Split Squat",
       "bodyPart": "legs",
       "muscleSlugs": [
         "quadriceps"
@@ -3129,7 +3127,7 @@
     },
     {
       "id": "Barbell_Upright_Row_V_2",
-      "name": "Barbell Upright Row V 2",
+      "name": "Barbell Upright Row",
       "bodyPart": "back",
       "muscleSlugs": [
         "traps"
@@ -3144,7 +3142,7 @@
     },
     {
       "id": "Barbell_Upright_Row_V_3",
-      "name": "Barbell Upright Row V 3",
+      "name": "Barbell Upright Row",
       "bodyPart": "back",
       "muscleSlugs": [
         "traps"
@@ -3234,7 +3232,7 @@
     },
     {
       "id": "Barbell_Wrist_Curl_V_2",
-      "name": "Barbell Wrist Curl V 2",
+      "name": "Barbell Wrist Curl",
       "bodyPart": "forearms",
       "muscleSlugs": [
         "forearms"
@@ -3295,13 +3293,11 @@
     {
       "id": "Bench_Dip_Knees_Bent",
       "name": "Bench Dip Knees Bent",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -3312,13 +3308,11 @@
     {
       "id": "Bench_Dip_On_Floor",
       "name": "Bench Dip On Floor",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -3374,12 +3368,12 @@
     {
       "id": "Biceps_Narrow_Pull-Ups",
       "name": "Biceps Narrow Pull-Ups",
-      "bodyPart": "back",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "lats"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -3389,12 +3383,12 @@
     {
       "id": "Biceps_Pull-Up",
       "name": "Biceps Pull-Up",
-      "bodyPart": "back",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "lats"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -4174,7 +4168,7 @@
     },
     {
       "id": "Cable_Kneeling_Rear_Delt_Row_With_Rope_Male",
-      "name": "Cable Kneeling Rear Delt Row With Rope Male",
+      "name": "Cable Kneeling Rear Delt Row With Rope",
       "bodyPart": "back",
       "muscleSlugs": [
         "middle-back"
@@ -4325,14 +4319,12 @@
     {
       "id": "Cable_Lying_Extension_Pullover_With_Rope_Attachment",
       "name": "Cable Lying Extension Pullover With Rope Attachment",
-      "bodyPart": "back",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "lats",
-        "middle-back"
+        "triceps"
       ],
       "primaryMuscles": [
-        "Lats",
-        "Middle Back"
+        "Triceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -4356,7 +4348,7 @@
     },
     {
       "id": "Cable_Lying_Triceps_Extension_V_2",
-      "name": "Cable Lying Triceps Extension V 2",
+      "name": "Cable Lying Triceps Extension",
       "bodyPart": "triceps",
       "muscleSlugs": [
         "triceps"
@@ -4732,12 +4724,12 @@
     {
       "id": "Cable_Pulldown_Bicep_Curl",
       "name": "Cable Pulldown Bicep Curl",
-      "bodyPart": "back",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "lats"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Lats"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -4776,7 +4768,7 @@
     },
     {
       "id": "Cable_Pushdown_Straight_Arm_V_2",
-      "name": "Cable Pushdown Straight Arm V 2",
+      "name": "Cable Pushdown Straight Arm",
       "bodyPart": "triceps",
       "muscleSlugs": [
         "triceps"
@@ -5668,12 +5660,12 @@
     {
       "id": "Cable_Two_Arm_Curl_On_Incline_Bench",
       "name": "Cable Two Arm Curl On Incline Bench",
-      "bodyPart": "chest",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "upper-chest"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Upper Chest"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -5892,7 +5884,7 @@
     },
     {
       "id": "Chest_Tap_Push-Up_Male",
-      "name": "Chest Tap Push-Up Male",
+      "name": "Chest Tap Push-Up",
       "bodyPart": "chest",
       "muscleSlugs": [
         "chest"
@@ -6301,7 +6293,7 @@
     },
     {
       "id": "Dumbbell_Arnold_Press_V_2",
-      "name": "Dumbbell Arnold Press V 2",
+      "name": "Dumbbell Arnold Press",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "front-delts",
@@ -6560,7 +6552,7 @@
     },
     {
       "id": "Dumbbell_Cross_Body_Hammer_Curl_V_2",
-      "name": "Dumbbell Cross Body Hammer Curl V 2",
+      "name": "Dumbbell Cross Body Hammer Curl",
       "bodyPart": "biceps",
       "muscleSlugs": [
         "biceps"
@@ -6680,7 +6672,7 @@
     },
     {
       "id": "Dumbbell_Decline_Shrug_V_2",
-      "name": "Dumbbell Decline Shrug V 2",
+      "name": "Dumbbell Decline Shrug",
       "bodyPart": "back",
       "muscleSlugs": [
         "traps"
@@ -6785,7 +6777,7 @@
     },
     {
       "id": "Dumbbell_Front_Raise_V_2",
-      "name": "Dumbbell Front Raise V 2",
+      "name": "Dumbbell Front Raise",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "front-delts"
@@ -6844,6 +6836,21 @@
       "matched": true
     },
     {
+      "id": "Dumbbell_Hammer_Curl_V_2",
+      "name": "Dumbbell Hammer Curl",
+      "bodyPart": "biceps",
+      "muscleSlugs": [
+        "biceps"
+      ],
+      "primaryMuscles": [
+        "Biceps"
+      ],
+      "secondaryMuscles": [],
+      "secondarySlugs": [],
+      "svgPath": "/static/muscle-maps/Dumbbell_Hammer_Curl_V_2.svg",
+      "matched": true
+    },
+    {
       "id": "Dumbbell_Hammer_Curl_On_Exercise_Ball",
       "name": "Dumbbell Hammer Curl On Exercise Ball",
       "bodyPart": "biceps",
@@ -6856,21 +6863,6 @@
       "secondaryMuscles": [],
       "secondarySlugs": [],
       "svgPath": "/static/muscle-maps/Dumbbell_Hammer_Curl_On_Exercise_Ball.svg",
-      "matched": true
-    },
-    {
-      "id": "Dumbbell_Hammer_Curl_V_2",
-      "name": "Dumbbell Hammer Curl V 2",
-      "bodyPart": "biceps",
-      "muscleSlugs": [
-        "biceps"
-      ],
-      "primaryMuscles": [
-        "Biceps"
-      ],
-      "secondaryMuscles": [],
-      "secondarySlugs": [],
-      "svgPath": "/static/muscle-maps/Dumbbell_Hammer_Curl_V_2.svg",
       "matched": true
     },
     {
@@ -7819,7 +7811,7 @@
     },
     {
       "id": "Dumbbell_One_Arm_Shoulder_Press_V_2",
-      "name": "Dumbbell One Arm Shoulder Press V 2",
+      "name": "Dumbbell One Arm Shoulder Press",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "front-delts",
@@ -8436,14 +8428,12 @@
     {
       "id": "Dumbbell_Seated_Biceps_Curl_To_Shoulder_Press",
       "name": "Dumbbell Seated Biceps Curl To Shoulder Press",
-      "bodyPart": "shoulders",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "front-delts",
-        "side-delts"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Front Delt",
-        "Side Delt"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -8527,7 +8517,7 @@
     },
     {
       "id": "Dumbbell_Seated_Lateral_Raise_V_2",
-      "name": "Dumbbell Seated Lateral Raise V 2",
+      "name": "Dumbbell Seated Lateral Raise",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "side-delts"
@@ -8923,7 +8913,7 @@
     },
     {
       "id": "Dumbbell_Standing_Inner_Biceps_Curl_V_2",
-      "name": "Dumbbell Standing Inner Biceps Curl V 2",
+      "name": "Dumbbell Standing Inner Biceps Curl",
       "bodyPart": "biceps",
       "muscleSlugs": [
         "biceps"
@@ -8954,12 +8944,12 @@
     {
       "id": "Dumbbell_Standing_One_Arm_Curl_Over_Incline_Bench",
       "name": "Dumbbell Standing One Arm Curl Over Incline Bench",
-      "bodyPart": "chest",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "upper-chest"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Upper Chest"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -8968,13 +8958,13 @@
     },
     {
       "id": "Dumbbell_Standing_One_Arm_Curl_Over_Incline_Bench_1680",
-      "name": "Dumbbell Standing One Arm Curl Over Incline Bench 1680",
-      "bodyPart": "chest",
+      "name": "Dumbbell Standing One Arm Curl Over Incline Bench",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "upper-chest"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Upper Chest"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -9197,7 +9187,7 @@
     },
     {
       "id": "Dynamic_Chest_Stretch_Male",
-      "name": "Dynamic Chest Stretch Male",
+      "name": "Dynamic Chest Stretch",
       "bodyPart": "stretch",
       "muscleSlugs": [
         "mobility"
@@ -9683,7 +9673,7 @@
     },
     {
       "id": "Forward_Lunge_Male",
-      "name": "Forward Lunge Male",
+      "name": "Forward Lunge",
       "bodyPart": "legs",
       "muscleSlugs": [
         "quadriceps"
@@ -9773,7 +9763,7 @@
     },
     {
       "id": "Glute_Bridge_Two_Legs_On_Bench_Male",
-      "name": "Glute Bridge Two Legs On Bench Male",
+      "name": "Glute Bridge Two Legs On Bench",
       "bodyPart": "legs",
       "muscleSlugs": [
         "glutes"
@@ -9848,7 +9838,7 @@
     },
     {
       "id": "Half_Sit-Up_Male",
-      "name": "Half Sit-Up Male",
+      "name": "Half Sit-Up",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -10150,7 +10140,7 @@
     },
     {
       "id": "Jack_Jump_Male",
-      "name": "Jack Jump Male",
+      "name": "Jack Jump",
       "bodyPart": "cardio",
       "muscleSlugs": [
         "cardio"
@@ -10225,7 +10215,7 @@
     },
     {
       "id": "Jump_Squat_V_2",
-      "name": "Jump Squat V 2",
+      "name": "Jump Squat",
       "bodyPart": "legs",
       "muscleSlugs": [
         "quadriceps"
@@ -10379,7 +10369,7 @@
     },
     {
       "id": "Kneeling_Plank_Tap_Shoulder_Male",
-      "name": "Kneeling Plank Tap Shoulder Male",
+      "name": "Kneeling Plank Tap Shoulder",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "front-delts",
@@ -10396,7 +10386,7 @@
     },
     {
       "id": "Kneeling_Push-Up_Male",
-      "name": "Kneeling Push-Up Male",
+      "name": "Kneeling Push-Up",
       "bodyPart": "chest",
       "muscleSlugs": [
         "chest"
@@ -10533,7 +10523,7 @@
     },
     {
       "id": "Lever_Chest_Press_0576",
-      "name": "Lever Chest Press 0576",
+      "name": "Lever Chest Press",
       "bodyPart": "chest",
       "muscleSlugs": [
         "chest"
@@ -10608,7 +10598,7 @@
     },
     {
       "id": "Lever_Gripless_Shrug_V_2",
-      "name": "Lever Gripless Shrug V 2",
+      "name": "Lever Gripless Shrug",
       "bodyPart": "back",
       "muscleSlugs": [
         "traps"
@@ -10653,7 +10643,7 @@
     },
     {
       "id": "Lever_Incline_Chest_Press_V_2",
-      "name": "Lever Incline Chest Press V 2",
+      "name": "Lever Incline Chest Press",
       "bodyPart": "chest",
       "muscleSlugs": [
         "chest"
@@ -10731,13 +10721,11 @@
     {
       "id": "Lever_Overhand_Triceps_Dip",
       "name": "Lever Overhand Triceps Dip",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -10821,6 +10809,21 @@
       "matched": true
     },
     {
+      "id": "Lever_Seated_Crunch_V_2",
+      "name": "Lever Seated Crunch",
+      "bodyPart": "core",
+      "muscleSlugs": [
+        "abs"
+      ],
+      "primaryMuscles": [
+        "Abs"
+      ],
+      "secondaryMuscles": [],
+      "secondarySlugs": [],
+      "svgPath": "/static/muscle-maps/Lever_Seated_Crunch_V_2.svg",
+      "matched": true
+    },
+    {
       "id": "Lever_Seated_Crunch_Chest_Pad",
       "name": "Lever Seated Crunch Chest Pad",
       "bodyPart": "chest",
@@ -10833,21 +10836,6 @@
       "secondaryMuscles": [],
       "secondarySlugs": [],
       "svgPath": "/static/muscle-maps/Lever_Seated_Crunch_Chest_Pad.svg",
-      "matched": true
-    },
-    {
-      "id": "Lever_Seated_Crunch_V_2",
-      "name": "Lever Seated Crunch V 2",
-      "bodyPart": "core",
-      "muscleSlugs": [
-        "abs"
-      ],
-      "primaryMuscles": [
-        "Abs"
-      ],
-      "secondaryMuscles": [],
-      "secondarySlugs": [],
-      "svgPath": "/static/muscle-maps/Lever_Seated_Crunch_V_2.svg",
       "matched": true
     },
     {
@@ -10961,7 +10949,7 @@
     },
     {
       "id": "Lever_Shoulder_Press_V_2",
-      "name": "Lever Shoulder Press V 2",
+      "name": "Lever Shoulder Press",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "front-delts",
@@ -10978,7 +10966,7 @@
     },
     {
       "id": "Lever_Shoulder_Press_V_3",
-      "name": "Lever Shoulder Press V 3",
+      "name": "Lever Shoulder Press",
       "bodyPart": "shoulders",
       "muscleSlugs": [
         "front-delts",
@@ -11071,12 +11059,12 @@
     {
       "id": "Lower_Back_Curl",
       "name": "Lower Back Curl",
-      "bodyPart": "back",
+      "bodyPart": "biceps",
       "muscleSlugs": [
-        "lower-back"
+        "biceps"
       ],
       "primaryMuscles": [
-        "Lower Back"
+        "Biceps"
       ],
       "secondaryMuscles": [],
       "secondarySlugs": [],
@@ -11295,7 +11283,7 @@
     },
     {
       "id": "Modified_Hindu_Push-Up_Male",
-      "name": "Modified Hindu Push-Up Male",
+      "name": "Modified Hindu Push-Up",
       "bodyPart": "chest",
       "muscleSlugs": [
         "chest"
@@ -11370,7 +11358,7 @@
     },
     {
       "id": "Oblique_Crunch_V_2",
-      "name": "Oblique Crunch V 2",
+      "name": "Oblique Crunch",
       "bodyPart": "core",
       "muscleSlugs": [
         "obliques"
@@ -11584,7 +11572,7 @@
     },
     {
       "id": "Prisoner_Half_Sit-Up_Male",
-      "name": "Prisoner Half Sit-Up Male",
+      "name": "Prisoner Half Sit-Up",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -12076,7 +12064,7 @@
     },
     {
       "id": "Scissor_Jumps_Male",
-      "name": "Scissor Jumps Male",
+      "name": "Scissor Jumps",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -12091,7 +12079,7 @@
     },
     {
       "id": "Seated_Calf_Stretch_Male",
-      "name": "Seated Calf Stretch Male",
+      "name": "Seated Calf Stretch",
       "bodyPart": "stretch",
       "muscleSlugs": [
         "mobility"
@@ -12181,7 +12169,7 @@
     },
     {
       "id": "Semi_Squat_Jump_Male",
-      "name": "Semi Squat Jump Male",
+      "name": "Semi Squat Jump",
       "bodyPart": "legs",
       "muscleSlugs": [
         "quadriceps"
@@ -12367,7 +12355,7 @@
     },
     {
       "id": "Sit-Up_V_2",
-      "name": "Sit-Up V 2",
+      "name": "Sit-Up",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -12609,7 +12597,7 @@
     },
     {
       "id": "Smith_Reverse_Calf_Raises_1394",
-      "name": "Smith Reverse Calf Raises 1394",
+      "name": "Smith Reverse Calf Raises",
       "bodyPart": "legs",
       "muscleSlugs": [
         "calves"
@@ -12857,7 +12845,7 @@
     },
     {
       "id": "Star_Jump_Male",
-      "name": "Star Jump Male",
+      "name": "Star Jump",
       "bodyPart": "cardio",
       "muscleSlugs": [
         "cardio"
@@ -12872,7 +12860,7 @@
     },
     {
       "id": "Stationary_Bike_Run_V_3",
-      "name": "Stationary Bike Run V 3",
+      "name": "Stationary Bike Run",
       "bodyPart": "cardio",
       "muscleSlugs": [
         "cardio"
@@ -12918,13 +12906,11 @@
     {
       "id": "Three_Bench_Dip",
       "name": "Three Bench Dip",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -12950,13 +12936,11 @@
     {
       "id": "Triceps_Dip",
       "name": "Triceps Dip",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -12967,13 +12951,11 @@
     {
       "id": "Triceps_Dip_Bench_Leg",
       "name": "Triceps Dip Bench Leg",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -12984,13 +12966,11 @@
     {
       "id": "Triceps_Dip_Between_Benches",
       "name": "Triceps Dip Between Benches",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -13001,13 +12981,11 @@
     {
       "id": "Triceps_Dips_Floor",
       "name": "Triceps Dips Floor",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -13062,7 +13040,7 @@
     },
     {
       "id": "Twisted_Leg_Raise_Female",
-      "name": "Twisted Leg Raise Female",
+      "name": "Twisted Leg Raise",
       "bodyPart": "core",
       "muscleSlugs": [
         "abs"
@@ -13138,13 +13116,11 @@
     {
       "id": "Weighted_Bench_Dip",
       "name": "Weighted Bench Dip",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -13260,6 +13236,21 @@
       "matched": true
     },
     {
+      "id": "Weighted_Russian_Twist_V_2",
+      "name": "Weighted Russian Twist",
+      "bodyPart": "core",
+      "muscleSlugs": [
+        "obliques"
+      ],
+      "primaryMuscles": [
+        "Obliques"
+      ],
+      "secondaryMuscles": [],
+      "secondarySlugs": [],
+      "svgPath": "/static/muscle-maps/Weighted_Russian_Twist_V_2.svg",
+      "matched": true
+    },
+    {
       "id": "Weighted_Russian_Twist_Legs_Up",
       "name": "Weighted Russian Twist Legs Up",
       "bodyPart": "core",
@@ -13272,21 +13263,6 @@
       "secondaryMuscles": [],
       "secondarySlugs": [],
       "svgPath": "/static/muscle-maps/Weighted_Russian_Twist_Legs_Up.svg",
-      "matched": true
-    },
-    {
-      "id": "Weighted_Russian_Twist_V_2",
-      "name": "Weighted Russian Twist V 2",
-      "bodyPart": "core",
-      "muscleSlugs": [
-        "obliques"
-      ],
-      "primaryMuscles": [
-        "Obliques"
-      ],
-      "secondaryMuscles": [],
-      "secondarySlugs": [],
-      "svgPath": "/static/muscle-maps/Weighted_Russian_Twist_V_2.svg",
       "matched": true
     },
     {
@@ -13339,13 +13315,11 @@
     {
       "id": "Weighted_Three_Bench_Dips",
       "name": "Weighted Three Bench Dips",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -13356,13 +13330,11 @@
     {
       "id": "Weighted_Tricep_Dips",
       "name": "Weighted Tricep Dips",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],
@@ -13373,13 +13345,11 @@
     {
       "id": "Weighted_Triceps_Dip_On_High_Parallel_Bars",
       "name": "Weighted Triceps Dip On High Parallel Bars",
-      "bodyPart": "chest",
+      "bodyPart": "triceps",
       "muscleSlugs": [
-        "chest",
         "triceps"
       ],
       "primaryMuscles": [
-        "Chest",
         "Triceps"
       ],
       "secondaryMuscles": [],

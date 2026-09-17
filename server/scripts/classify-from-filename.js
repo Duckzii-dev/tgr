@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Detailed muscle classification v6.
- * Rule order: SPECIFIC FIRST (abs/obliques → traps/rear-delt → others).
+ * Detailed muscle classification v7.
+ * - Bỏ suffix số/gender trước khi match
+ * - Rules: CURL/BICEP + WRIST/FOREARM ưu tiên CAO
  */
 
 import fs from 'fs/promises';
@@ -39,49 +40,87 @@ const LABELS = {
 };
 function labelFor(slug) { return LABELS[slug] || slug; }
 
+/**
+ * Bỏ suffix số/gender/version khỏi tên.
+ *   "..._Curl_Over_Incline_Bench_1680" → "...Curl Over Incline Bench"
+ *   "..._V_2" → "..."
+ *   "..._Male" → "..."
+ */
+function stripSuffixes(id) {
+  let s = id;
+  // Bỏ suffix _1680, _1234 (số dài)
+  s = s.replace(/_\d{3,}$/, '');
+  // Bỏ suffix _v_1, _v_2, _v1, _v2
+  s = s.replace(/_v_?\d+$/i, '');
+  // Bỏ suffix _male, _female
+  s = s.replace(/_(male|female)$/i, '');
+  // Bỏ suffix _1680_male (kết hợp)
+  s = s.replace(/_\d{3,}_(male|female)$/i, '');
+  // Bỏ " 1680" (nếu có space + số)
+  s = s.replace(/\s+\d{3,}$/, '');
+  return s;
+}
+
 // ============================================================
-// RULES — ORDER: MOST SPECIFIC FIRST
+// RULES — ORDER QUAN TRỌNG
 // ============================================================
 const RULES = [
-  // ========== 1. STRETCH (nhất định trước) ==========
+  // ========== 1. STRETCH ==========
   { kw: ['stretch', 'mobility', 'foam roll', 'cat cow', 'downward dog',
          'pigeon', 'hip opener', 'shoulder dislocate', 'sun salutation',
          'world greatest', 'dynamic warm', 'warm up', 'cossack',
          '90 90', 'deep squat hold', 'pose', 'yoga', 'reclining',
-         'big toe pose', 'sleeper stretch', 'pigeon pose',
-         'butterfly pose', 'cobra stretch', 'child pose'],
+         'big toe pose', 'sleeper stretch'],
     slugs: ['mobility'], bp: 'stretch' },
 
-  // ========== 2. FOREARMS ==========
-  { kw: ['wrist curl', 'wrist extension', 'reverse wrist curl',
-         'wrist extensor', 'wrist flexor', 'reverse wrist',
-         'farmer walk', 'farmer carry', 'farmers walk', 'plate pinch',
-         'hand grip', 'wrist'],
+  // ========== 2. FOREARMS — TRƯỚC BICEPS ==========
+  // Wrist curl, farmer walk, dead hang → forearms, KHÔNG PHẢI biceps
+  { kw: ['wrist curl', 'wrist extension', 'reverse wrist',
+         'wrist extensor', 'wrist flexor', 'wrist'],
     slugs: ['forearms'], bp: 'forearms' },
 
-  // ========== 3. NECK ==========
-  { kw: ['neck', 'head turn', 'head tilt', 'neck flexion', 'neck extension'],
+  { kw: ['farmer walk', 'farmer carry', 'farmers walk',
+         'plate pinch', 'hand grip'],
+    slugs: ['forearms'], bp: 'forearms' },
+
+  // ========== 3. BICEPS — TRƯỚC CHEST/SHOULDER ==========
+  // Curl luôn là biceps (bất kể tên phụ)
+  { kw: ['curl', 'bicep', 'biceps', 'zottman', '21s'],
+    slugs: ['biceps'], bp: 'biceps' },
+
+  // ========== 4. TRICEPS ==========
+  { kw: ['tricep', 'triceps', 'skull crusher', 'skullcrusher',
+         'pushdown', 'push down', 'kickback', 'overhead extension',
+         'bench dip', 'diamond pushup', 'jm press', 'tate press',
+         'lying extension', 'french press', 'concentration extension',
+         'cable extension', 'seated extension', 'standing one arm extension',
+         'incline two arm extension', 'close grip press', 'close grip bench',
+         'close grip to skull', 'tricep extension'],
+    slugs: ['triceps'], bp: 'triceps' },
+
+  // ========== 5. NECK ==========
+  { kw: ['neck', 'head turn', 'head tilt'],
     slugs: ['neck'], bp: 'shoulders' },
 
-  // ========== 4. TRAPS ==========
+  // ========== 6. TRAPS ==========
   { kw: ['shrug', 'trap', 'upright row', 'face pull',
          'y raise', 'y-raise', 'band pull apart'],
     slugs: ['traps'], bp: 'back' },
 
-  // ========== 5. REAR DELTS ==========
+  // ========== 7. REAR DELTS ==========
   { kw: ['reverse fly', 'reverse-fly', 'rear delt fly', 'rear delt raise',
          'bent over lateral raise', 'lying one arm deltoid rear'],
     slugs: ['rear-delts'], bp: 'shoulders' },
 
-  // ========== 6. FRONT DELTS ==========
+  // ========== 8. FRONT DELTS ==========
   { kw: ['front raise', 'forward raise'],
     slugs: ['front-delts'], bp: 'shoulders' },
 
-  // ========== 7. SIDE DELTS ==========
+  // ========== 9. SIDE DELTS ==========
   { kw: ['lateral raise', 'side delt', 'side lateral'],
     slugs: ['side-delts'], bp: 'shoulders' },
 
-  // ========== 8. SHOULDERS (chung) ==========
+  // ========== 10. SHOULDERS chung ==========
   { kw: ['shoulder press', 'overhead press', 'military press',
          'arnold press', 'delt raise', 'plate raise', 'landmine press',
          'pike press', 'shoulder raise', 'bradford press', 'bradford rock',
@@ -94,12 +133,12 @@ const RULES = [
          'overhead reach', 'shoulder'],
     slugs: ['front-delts', 'side-delts'], bp: 'shoulders' },
 
-  // ========== 9. UPPER CHEST ==========
+  // ========== 11. UPPER CHEST ==========
   { kw: ['incline bench', 'incline press', 'incline dumbbell', 'incline fly',
          'upper chest', 'low to high cable fly', 'low cable fly'],
     slugs: ['upper-chest'], bp: 'chest' },
 
-  // ========== 10. CHEST ==========
+  // ========== 12. CHEST ==========
   { kw: ['bench press', 'chest press', 'pec deck', 'chest fly',
          'cable fly', 'crossover', 'cross over', 'cross-over',
          'decline press', 'decline fly', 'dumbbell fly', 'machine fly',
@@ -113,53 +152,39 @@ const RULES = [
 
   { kw: ['dip'], slugs: ['chest', 'triceps'], bp: 'chest' },
 
-  // ========== 11. LATS ==========
+  // ========== 13. LATS ==========
   { kw: ['pullup', 'pull-up', 'pull up', 'pulldown', 'pull down',
          'lat pull', 'lat pulldown', 'chin up', 'chinup', 'chin-up',
          'lat pullover', 'straight arm pulldown', 'lat'],
     slugs: ['lats'], bp: 'back' },
 
-  // ========== 12. MIDDLE BACK ==========
+  // ========== 14. MIDDLE BACK ==========
   { kw: ['row', 't bar', 'tbar', 'seated row', 'inverted row',
          'cable row', 'barbell row', 'dumbbell row', 'machine row',
          'cable twisting pull', 'judo flip', 'middle back'],
     slugs: ['middle-back'], bp: 'back' },
 
-  // ========== 13. LOWER BACK ==========
+  // ========== 15. LOWER BACK ==========
   { kw: ['deadlift', 'dead lift', 'back extension', 'hyperextension',
          'reverse hyper', 'good morning', 'rack pull',
          'clean and press', 'power clean', 'hang clean', 'lower back',
          'erector'],
     slugs: ['lower-back'], bp: 'back' },
 
-  // ========== 14. CLEAN/SNATCH/JERK ==========
+  // ========== 16. OLY ==========
   { kw: ['snatch', 'jerk', 'clean'],
     slugs: ['quadriceps', 'hamstrings', 'lower-back'], bp: 'legs' },
 
-  // ========== 15. BACK chung ==========
+  // ========== 17. BACK chung ==========
   { kw: ['pullover', 'bent arm pullover'],
     slugs: ['lats', 'middle-back'], bp: 'back' },
-
-  // ========== 16. BICEPS ==========
-  { kw: ['curl', 'bicep', 'biceps', 'zottman', '21s'],
-    slugs: ['biceps'], bp: 'biceps' },
-
-  // ========== 17. TRICEPS ==========
-  { kw: ['tricep', 'triceps', 'skull crusher', 'skullcrusher', 'skull',
-         'pushdown', 'kickback', 'overhead extension', 'bench dip',
-         'diamond pushup', 'jm press', 'tate press', 'lying extension',
-         'french press', 'concentration extension', 'cable extension',
-         'seated extension', 'standing one arm extension',
-         'incline two arm extension', 'close grip press', 'close grip bench',
-         'close grip to skull', 'tricep extension'],
-    slugs: ['triceps'], bp: 'triceps' },
 
   // ========== 18. OBLIQUES ==========
   { kw: ['oblique', 'side bend', 'wood chop', 'side plank', 'side crunch',
          'russian twist'],
     slugs: ['obliques'], bp: 'core' },
 
-  // ========== 19. ABS (trước legs để bắt "leg raise" abs) ==========
+  // ========== 19. ABS ==========
   { kw: ['crunch', 'sit up', 'situp', 'sit-up', 'plank', 'leg raise',
          'knee raise', 'hanging leg', 'hanging knee', 'hanging',
          'ab wheel', 'ab roller', 'jackknife',
@@ -184,7 +209,7 @@ const RULES = [
          'nordic curl'],
     slugs: ['hamstrings'], bp: 'legs' },
 
-  // ========== 22. CALVES (trước quads để bắt "calf") ==========
+  // ========== 22. CALVES ==========
   { kw: ['calf raise', 'calf press', 'calf', 'calves', 'donkey calf',
          'seated calf', 'standing calf'],
     slugs: ['calves'], bp: 'legs' },
@@ -213,7 +238,10 @@ const RULES = [
 ];
 
 function classifyByFilename(id) {
-  const lower = id.toLowerCase().replace(/[_-]+/g, ' ');
+  // 1. Bỏ suffix số/gender/version
+  const cleaned = stripSuffixes(id);
+  const lower = cleaned.toLowerCase().replace(/[_-]+/g, ' ');
+
   for (const rule of RULES) {
     for (const kw of rule.kw) {
       const kwLower = kw.replace(/_/g, ' ');
@@ -226,7 +254,7 @@ function classifyByFilename(id) {
 }
 
 async function main() {
-  console.log('🚀 Classify v6 (ordered)');
+  console.log('🚀 Classify v7');
 
   const files = await fs.readdir(MAPS_DIR);
   const svgFiles = files.filter(f => f.endsWith('.svg'));
@@ -237,7 +265,8 @@ async function main() {
 
   for (const file of svgFiles) {
     const id = file.replace('.svg', '');
-    const displayName = id.replace(/_/g, ' ');
+    // Tên hiển thị: bỏ suffix cho đẹp
+    const displayName = stripSuffixes(id).replace(/_/g, ' ');
     const cls = classifyByFilename(id);
 
     byGroup[cls.bodyPart] = (byGroup[cls.bodyPart] || 0) + 1;
@@ -274,7 +303,7 @@ async function main() {
 
   const output = {
     _meta: {
-      source: 'detailed-classification-v6',
+      source: 'detailed-classification-v7',
       generatedAt: new Date().toISOString(),
       totalExercises: results.length,
       byGroup,
@@ -287,13 +316,15 @@ async function main() {
   console.log('');
   console.log(`✅ Wrote ${OUT_FILE}`);
 
-  // Verify Assisted Hanging Knee Raise
-  const check = results.find(r => r.id === 'Assisted_Hanging_Knee_Raise_With_Throw_Down');
-  if (check) {
+  // Verify the bug case
+  const bugCase = results.find(r => r.id.includes('Dumbbell_Standing_One_Arm_Curl_Over_Incline_Bench'));
+  if (bugCase) {
     console.log('');
-    console.log('📋 Check "Assisted Hanging Knee Raise":');
-    console.log(`   bodyPart: ${check.bodyPart}`);
-    console.log(`   muscleSlugs: ${check.muscleSlugs.join(', ')}`);
+    console.log('📋 Check bug case:');
+    console.log(`   id: ${bugCase.id}`);
+    console.log(`   name: ${bugCase.name}`);
+    console.log(`   bodyPart: ${bugCase.bodyPart}`);
+    console.log(`   muscleSlugs: ${bugCase.muscleSlugs.join(', ')}`);
   }
 }
 
