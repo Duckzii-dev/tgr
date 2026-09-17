@@ -212,7 +212,7 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
             <svg
               viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
               width="240"
-              height="480"
+              height="500"
               className="relative shrink-0 select-none"
               style={{ overflow: 'visible' }}
             >
@@ -260,6 +260,16 @@ export default function MuscleRecoveryMap({ recovery = [] }) {
                 ))}
               </g>
               {musclesInView.map((slug) => renderMuscle(slug))}
+              
+              {/* Abs 6-pack lines */}
+              {view === 'front' && (
+                <g opacity="0.35" pointerEvents="none">
+                  <line x1="110" y1="155" x2="110" y2="225" stroke="#0b0c0e" strokeWidth="1.2" />
+                  <line x1="88" y1="175" x2="132" y2="175" stroke="#0b0c0e" strokeWidth="1" />
+                  <line x1="88" y1="197" x2="132" y2="197" stroke="#0b0c0e" strokeWidth="1" />
+                  <line x1="90" y1="218" x2="130" y2="218" stroke="#0b0c0e" strokeWidth="1" />
+                </g>
+              )}
             </svg>
           </div>
 

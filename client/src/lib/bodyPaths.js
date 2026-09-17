@@ -1,9 +1,10 @@
 /**
- * Body SVG paths — anatomy chuẩn, tỷ lệ người lớn.
- * ViewBox: 220 × 500 (1 head ≈ 66px, 7.5 heads tall).
+ * Body SVG paths — phiên bản "đô con" (V-taper, wide shoulders).
+ * ViewBox: 220 × 520
+ * Tỷ lệ: đầu ~62px, vai rộng 140px, eo 90px.
  */
 
-export const VIEWBOX = { width: 220, height: 500 };
+export const VIEWBOX = { width: 220, height: 520 };
 
 const CX = 110;
 
@@ -13,50 +14,62 @@ export const BODY_PATHS = {
   // ============================================================
   front: {
     _base: [
-      // Head + neck
-      `M ${CX} 12 Q ${CX + 18} 12 ${CX + 18} 32 Q ${CX + 18} 52 ${CX + 12} 56 L ${CX + 10} 62 L ${CX - 10} 62 L ${CX - 12} 56 Q ${CX - 18} 52 ${CX - 18} 32 Q ${CX - 18} 12 ${CX} 12 Z`,
-      // Torso
-      `M ${CX - 10} 62 L ${CX - 34} 78 Q ${CX - 38} 88 ${CX - 36} 110 L ${CX - 32} 200 Q ${CX - 30} 215 ${CX - 28} 230 L ${CX - 30} 300 L ${CX + 30} 300 L ${CX + 28} 230 Q ${CX + 30} 215 ${CX + 32} 200 L ${CX + 36} 110 Q ${CX + 38} 88 ${CX + 34} 78 L ${CX + 10} 62 Z`,
-      // Left arm
-      `M ${CX - 36} 78 Q ${CX - 48} 80 ${CX - 50} 100 L ${CX - 52} 180 Q ${CX - 54} 200 ${CX - 52} 220 L ${CX - 40} 220 L ${CX - 38} 180 L ${CX - 36} 100 Q ${CX - 36} 88 ${CX - 34} 78 Z`,
+      // Head (slightly wider, stronger jaw)
+      `M ${CX} 8 Q ${CX + 20} 8 ${CX + 20} 28 Q ${CX + 20} 46 ${CX + 16} 54 L ${CX + 12} 60 L ${CX - 12} 60 L ${CX - 16} 54 Q ${CX - 20} 46 ${CX - 20} 28 Q ${CX - 20} 8 ${CX} 8 Z`,
+      // Neck (thick, trapezius slope)
+      `M ${CX - 14} 58 L ${CX - 14} 72 L ${CX - 44} 80 L ${CX - 50} 96 L ${CX - 50} 120 L ${CX - 52} 200 L ${CX - 44} 240 L ${CX - 40} 300 L ${CX + 40} 300 L ${CX + 44} 240 L ${CX + 52} 200 L ${CX + 50} 120 L ${CX + 50} 96 L ${CX + 44} 80 L ${CX + 14} 72 L ${CX + 14} 58 Z`,
+      // Left arm (with bicep bulge)
+      `M ${CX - 48} 82 Q ${CX - 64} 86 ${CX - 68} 110 L ${CX - 70} 170 L ${CX - 66} 190 L ${CX - 58} 210 L ${CX - 56} 230 L ${CX - 46} 230 L ${CX - 48} 210 L ${CX - 52} 190 L ${CX - 52} 170 L ${CX - 48} 110 Q ${CX - 42} 88 ${CX - 40} 82 Z`,
       // Right arm
-      `M ${CX + 36} 78 Q ${CX + 48} 80 ${CX + 50} 100 L ${CX + 52} 180 Q ${CX + 54} 200 ${CX + 52} 220 L ${CX + 40} 220 L ${CX + 38} 180 L ${CX + 36} 100 Q ${CX + 36} 88 ${CX + 34} 78 Z`,
-      // Left leg
-      `M ${CX - 28} 305 L ${CX - 6} 305 L ${CX - 8} 400 L ${CX - 10} 500 L ${CX - 28} 500 L ${CX - 26} 400 Z`,
+      `M ${CX + 48} 82 Q ${CX + 64} 86 ${CX + 68} 110 L ${CX + 70} 170 L ${CX + 66} 190 L ${CX + 58} 210 L ${CX + 56} 230 L ${CX + 46} 230 L ${CX + 48} 210 L ${CX + 52} 190 L ${CX + 52} 170 L ${CX + 48} 110 Q ${CX + 42} 88 ${CX + 40} 82 Z`,
+      // Left leg (thick quad + calf)
+      `M ${CX - 40} 305 Q ${CX - 42} 330 ${CX - 40} 380 L ${CX - 38} 420 Q ${CX - 36} 460 ${CX - 34} 500 L ${CX - 36} 520 L ${CX - 6} 520 L ${CX - 8} 420 L ${CX - 6} 380 L ${CX - 6} 305 Z`,
       // Right leg
-      `M ${CX + 6} 305 L ${CX + 28} 305 L ${CX + 26} 400 L ${CX + 28} 500 L ${CX + 10} 500 L ${CX + 8} 400 Z`,
+      `M ${CX + 6} 305 L ${CX + 6} 380 L ${CX + 8} 420 L ${CX + 6} 520 L ${CX + 36} 520 L ${CX + 34} 500 Q ${CX + 36} 460 ${CX + 38} 420 L ${CX + 40} 380 Q ${CX + 42} 330 ${CX + 40} 305 Z`,
     ],
 
-    neck: `M ${CX - 10} 62 L ${CX + 10} 62 L ${CX + 8} 76 L ${CX - 8} 76 Z`,
+    // Neck front
+    neck: `M ${CX - 14} 58 L ${CX + 14} 58 L ${CX + 12} 72 L ${CX - 12} 72 Z`,
 
-    traps: `M ${CX - 34} 78 Q ${CX} 68 ${CX + 34} 78 L ${CX + 30} 92 Q ${CX} 84 ${CX - 30} 92 Z`,
+    // Traps (V-slope to shoulders)
+    traps: `M ${CX - 44} 80 Q ${CX - 20} 70 ${CX} 68 Q ${CX + 20} 70 ${CX + 44} 80 L ${CX + 40} 92 Q ${CX + 20} 86 ${CX} 84 Q ${CX - 20} 86 ${CX - 40} 92 Z`,
 
-    front_delt_l: `M ${CX - 36} 80 Q ${CX - 52} 82 ${CX - 54} 96 Q ${CX - 54} 108 ${CX - 44} 110 L ${CX - 36} 100 Z`,
-    front_delt_r: `M ${CX + 36} 80 Q ${CX + 52} 82 ${CX + 54} 96 Q ${CX + 54} 108 ${CX + 44} 110 L ${CX + 36} 100 Z`,
+    // Front delts (rounded caps)
+    front_delt_l: `M ${CX - 48} 82 Q ${CX - 68} 84 ${CX - 70} 100 Q ${CX - 72} 116 ${CX - 60} 120 Q ${CX - 52} 118 ${CX - 44} 108 L ${CX - 44} 90 Z`,
+    front_delt_r: `M ${CX + 48} 82 Q ${CX + 68} 84 ${CX + 70} 100 Q ${CX + 72} 116 ${CX + 60} 120 Q ${CX + 52} 118 ${CX + 44} 108 L ${CX + 44} 90 Z`,
 
-    side_delt_l: `M ${CX - 52} 96 Q ${CX - 58} 108 ${CX - 56} 120 L ${CX - 50} 122 Q ${CX - 48} 110 ${CX - 46} 100 Z`,
-    side_delt_r: `M ${CX + 52} 96 Q ${CX + 58} 108 ${CX + 56} 120 L ${CX + 50} 122 Q ${CX + 48} 110 ${CX + 46} 100 Z`,
+    // Side delts (bulge)
+    side_delt_l: `M ${CX - 68} 96 Q ${CX - 76} 108 ${CX - 74} 128 Q ${CX - 68} 132 ${CX - 62} 128 Q ${CX - 62} 116 ${CX - 58} 104 Z`,
+    side_delt_r: `M ${CX + 68} 96 Q ${CX + 76} 108 ${CX + 74} 128 Q ${CX + 68} 132 ${CX + 62} 128 Q ${CX + 62} 116 ${CX + 58} 104 Z`,
 
-    upper_chest: `M ${CX - 30} 92 Q ${CX} 86 ${CX + 30} 92 L ${CX + 28} 110 Q ${CX} 104 ${CX - 28} 110 Z`,
+    // Upper chest (pectoral upper)
+    upper_chest: `M ${CX - 40} 92 Q ${CX - 20} 84 ${CX} 82 Q ${CX + 20} 84 ${CX + 40} 92 L ${CX + 38} 112 Q ${CX + 20} 106 ${CX} 104 Q ${CX - 20} 106 ${CX - 38} 112 Z`,
 
-    chest: `M ${CX - 28} 110 Q ${CX} 106 ${CX + 28} 110 L ${CX + 26} 132 Q ${CX} 138 ${CX - 26} 132 Z`,
+    // Mid/lower chest (pec mass)
+    chest: `M ${CX - 38} 114 Q ${CX - 20} 108 ${CX} 108 Q ${CX + 20} 108 ${CX + 38} 114 L ${CX + 34} 142 Q ${CX + 18} 148 ${CX} 148 Q ${CX - 18} 148 ${CX - 34} 142 Z`,
 
-    biceps_l: `M ${CX - 48} 128 Q ${CX - 54} 142 ${CX - 52} 165 L ${CX - 42} 168 Q ${CX - 42} 145 ${CX - 40} 130 Z`,
-    biceps_r: `M ${CX + 48} 128 Q ${CX + 54} 142 ${CX + 52} 165 L ${CX + 42} 168 Q ${CX + 42} 145 ${CX + 40} 130 Z`,
+    // Biceps (bulge on upper arm)
+    biceps_l: `M ${CX - 58} 126 Q ${CX - 68} 140 ${CX - 68} 162 Q ${CX - 62} 172 ${CX - 54} 170 Q ${CX - 52} 150 ${CX - 48} 132 Z`,
+    biceps_r: `M ${CX + 58} 126 Q ${CX + 68} 140 ${CX + 68} 162 Q ${CX + 62} 172 ${CX + 54} 170 Q ${CX + 52} 150 ${CX + 48} 132 Z`,
 
-    forearms_l: `M ${CX - 50} 170 Q ${CX - 52} 190 ${CX - 50} 210 L ${CX - 42} 212 Q ${CX - 42} 190 ${CX - 42} 172 Z`,
-    forearms_r: `M ${CX + 50} 170 Q ${CX + 52} 190 ${CX + 50} 210 L ${CX + 42} 212 Q ${CX + 42} 190 ${CX + 42} 172 Z`,
+    // Forearms
+    forearms_l: `M ${CX - 58} 174 Q ${CX - 60} 194 ${CX - 58} 214 Q ${CX - 52} 220 ${CX - 48} 218 Q ${CX - 48} 196 ${CX - 48} 176 Z`,
+    forearms_r: `M ${CX + 58} 174 Q ${CX + 60} 194 ${CX + 58} 214 Q ${CX + 52} 220 ${CX + 48} 218 Q ${CX + 48} 196 ${CX + 48} 176 Z`,
 
-    abs: `M ${CX - 22} 138 L ${CX + 22} 138 L ${CX + 20} 200 L ${CX - 20} 200 Z`,
+    // Abs (6-pack, có đường kẻ giữa)
+    abs: `M ${CX - 24} 152 L ${CX + 24} 152 L ${CX + 22} 226 L ${CX - 22} 226 Z`,
 
-    obliques_l: `M ${CX - 30} 138 L ${CX - 24} 140 L ${CX - 22} 200 L ${CX - 28} 200 Z`,
-    obliques_r: `M ${CX + 30} 138 L ${CX + 24} 140 L ${CX + 22} 200 L ${CX + 28} 200 Z`,
+    // Obliques
+    obliques_l: `M ${CX - 34} 152 L ${CX - 26} 154 L ${CX - 24} 226 L ${CX - 32} 226 Z`,
+    obliques_r: `M ${CX + 34} 152 L ${CX + 26} 154 L ${CX + 24} 226 L ${CX + 32} 226 Z`,
 
-    quads_l: `M ${CX - 28} 305 L ${CX - 6} 305 L ${CX - 8} 400 L ${CX - 26} 400 Z`,
-    quads_r: `M ${CX + 6} 305 L ${CX + 28} 305 L ${CX + 26} 400 L ${CX + 8} 400 Z`,
+    // Quads (thick thigh)
+    quads_l: `M ${CX - 40} 305 Q ${CX - 44} 350 ${CX - 40} 400 L ${CX - 6} 400 L ${CX - 6} 305 Z`,
+    quads_r: `M ${CX + 6} 305 L ${CX + 6} 400 L ${CX + 40} 400 Q ${CX + 44} 350 ${CX + 40} 305 Z`,
 
-    calves_l: `M ${CX - 26} 405 Q ${CX - 30} 440 ${CX - 28} 480 L ${CX - 12} 480 Q ${CX - 10} 440 ${CX - 10} 405 Z`,
-    calves_r: `M ${CX + 10} 405 Q ${CX + 10} 440 ${CX + 12} 480 L ${CX + 28} 480 Q ${CX + 30} 440 ${CX + 26} 405 Z`,
+    // Calves front (tibialis)
+    calves_l: `M ${CX - 36} 405 Q ${CX - 38} 440 ${CX - 36} 480 L ${CX - 12} 480 Q ${CX - 10} 440 ${CX - 10} 405 Z`,
+    calves_r: `M ${CX + 10} 405 Q ${CX + 10} 440 ${CX + 12} 480 L ${CX + 36} 480 Q ${CX + 38} 440 ${CX + 36} 405 Z`,
   },
 
   // ============================================================
@@ -64,45 +77,56 @@ export const BODY_PATHS = {
   // ============================================================
   back: {
     _base: [
-      `M ${CX} 12 Q ${CX + 18} 12 ${CX + 18} 32 Q ${CX + 18} 52 ${CX + 12} 56 L ${CX + 10} 62 L ${CX - 10} 62 L ${CX - 12} 56 Q ${CX - 18} 52 ${CX - 18} 32 Q ${CX - 18} 12 ${CX} 12 Z`,
-      `M ${CX - 10} 62 L ${CX - 34} 78 Q ${CX - 38} 88 ${CX - 36} 110 L ${CX - 32} 200 Q ${CX - 30} 215 ${CX - 28} 230 L ${CX - 30} 300 L ${CX + 30} 300 L ${CX + 28} 230 Q ${CX + 30} 215 ${CX + 32} 200 L ${CX + 36} 110 Q ${CX + 38} 88 ${CX + 34} 78 L ${CX + 10} 62 Z`,
-      `M ${CX - 36} 78 Q ${CX - 48} 80 ${CX - 50} 100 L ${CX - 52} 180 Q ${CX - 54} 200 ${CX - 52} 220 L ${CX - 40} 220 L ${CX - 38} 180 L ${CX - 36} 100 Z`,
-      `M ${CX + 36} 78 Q ${CX + 48} 80 ${CX + 50} 100 L ${CX + 52} 180 Q ${CX + 54} 200 ${CX + 52} 220 L ${CX + 40} 220 L ${CX + 38} 180 L ${CX + 36} 100 Z`,
-      `M ${CX - 28} 305 L ${CX - 6} 305 L ${CX - 8} 400 L ${CX - 10} 500 L ${CX - 28} 500 L ${CX - 26} 400 Z`,
-      `M ${CX + 6} 305 L ${CX + 28} 305 L ${CX + 26} 400 L ${CX + 28} 500 L ${CX + 10} 500 L ${CX + 8} 400 Z`,
+      `M ${CX} 8 Q ${CX + 20} 8 ${CX + 20} 28 Q ${CX + 20} 46 ${CX + 16} 54 L ${CX + 12} 60 L ${CX - 12} 60 L ${CX - 16} 54 Q ${CX - 20} 46 ${CX - 20} 28 Q ${CX - 20} 8 ${CX} 8 Z`,
+      `M ${CX - 14} 58 L ${CX - 14} 72 L ${CX - 44} 80 L ${CX - 50} 96 L ${CX - 50} 120 L ${CX - 52} 200 L ${CX - 44} 240 L ${CX - 40} 300 L ${CX + 40} 300 L ${CX + 44} 240 L ${CX + 52} 200 L ${CX + 50} 120 L ${CX + 50} 96 L ${CX + 44} 80 L ${CX + 14} 72 L ${CX + 14} 58 Z`,
+      `M ${CX - 48} 82 Q ${CX - 64} 86 ${CX - 68} 110 L ${CX - 70} 170 L ${CX - 66} 190 L ${CX - 58} 210 L ${CX - 56} 230 L ${CX - 46} 230 L ${CX - 48} 210 L ${CX - 52} 190 L ${CX - 52} 170 L ${CX - 48} 110 Q ${CX - 42} 88 ${CX - 40} 82 Z`,
+      `M ${CX + 48} 82 Q ${CX + 64} 86 ${CX + 68} 110 L ${CX + 70} 170 L ${CX + 66} 190 L ${CX + 58} 210 L ${CX + 56} 230 L ${CX + 46} 230 L ${CX + 48} 210 L ${CX + 52} 190 L ${CX + 52} 170 L ${CX + 48} 110 Q ${CX + 42} 88 ${CX + 40} 82 Z`,
+      `M ${CX - 40} 305 Q ${CX - 42} 330 ${CX - 40} 380 L ${CX - 38} 420 Q ${CX - 36} 460 ${CX - 34} 500 L ${CX - 36} 520 L ${CX - 6} 520 L ${CX - 8} 420 L ${CX - 6} 380 L ${CX - 6} 305 Z`,
+      `M ${CX + 6} 305 L ${CX + 6} 380 L ${CX + 8} 420 L ${CX + 6} 520 L ${CX + 36} 520 L ${CX + 34} 500 Q ${CX + 36} 460 ${CX + 38} 420 L ${CX + 40} 380 Q ${CX + 42} 330 ${CX + 40} 305 Z`,
     ],
 
-    neck: `M ${CX - 10} 62 L ${CX + 10} 62 L ${CX + 8} 76 L ${CX - 8} 76 Z`,
+    neck: `M ${CX - 14} 58 L ${CX + 14} 58 L ${CX + 12} 72 L ${CX - 12} 72 Z`,
 
-    traps: `M ${CX - 34} 78 Q ${CX} 66 ${CX + 34} 78 L ${CX + 26} 100 Q ${CX} 92 ${CX - 26} 100 Z`,
+    // Traps (diamond shape, wider)
+    traps: `M ${CX - 44} 80 Q ${CX - 20} 66 ${CX} 62 Q ${CX + 20} 66 ${CX + 44} 80 L ${CX + 36} 106 Q ${CX + 20} 96 ${CX} 94 Q ${CX - 20} 96 ${CX - 36} 106 Z`,
 
-    rear_delt_l: `M ${CX - 40} 92 Q ${CX - 56} 92 ${CX - 58} 108 L ${CX - 50} 118 Q ${CX - 48} 108 ${CX - 44} 100 Z`,
-    rear_delt_r: `M ${CX + 40} 92 Q ${CX + 56} 92 ${CX + 58} 108 L ${CX + 50} 118 Q ${CX + 48} 108 ${CX + 44} 100 Z`,
+    // Rear delts
+    rear_delt_l: `M ${CX - 50} 90 Q ${CX - 68} 88 ${CX - 72} 106 Q ${CX - 74} 122 ${CX - 60} 128 Q ${CX - 52} 122 ${CX - 46} 108 Z`,
+    rear_delt_r: `M ${CX + 50} 90 Q ${CX + 68} 88 ${CX + 72} 106 Q ${CX + 74} 122 ${CX + 60} 128 Q ${CX + 52} 122 ${CX + 46} 108 Z`,
 
-    side_delt_l: `M ${CX - 50} 120 Q ${CX - 54} 128 ${CX - 52} 138 L ${CX - 46} 138 Q ${CX - 46} 128 ${CX - 46} 118 Z`,
-    side_delt_r: `M ${CX + 50} 120 Q ${CX + 54} 128 ${CX + 52} 138 L ${CX + 46} 138 Q ${CX + 46} 128 ${CX + 46} 118 Z`,
+    // Side delts (back view)
+    side_delt_l: `M ${CX - 68} 128 Q ${CX - 74} 140 ${CX - 72} 154 Q ${CX - 64} 156 ${CX - 60} 148 Q ${CX - 58} 134 ${CX - 58} 124 Z`,
+    side_delt_r: `M ${CX + 68} 128 Q ${CX + 74} 140 ${CX + 72} 154 Q ${CX + 64} 156 ${CX + 60} 148 Q ${CX + 58} 134 ${CX + 58} 124 Z`,
 
-    lats_l: `M ${CX - 32} 100 Q ${CX - 40} 130 ${CX - 30} 170 L ${CX - 12} 170 L ${CX - 14} 104 Q ${CX - 22} 100 ${CX - 32} 100 Z`,
-    lats_r: `M ${CX + 32} 100 Q ${CX + 40} 130 ${CX + 30} 170 L ${CX + 12} 170 L ${CX + 14} 104 Q ${CX + 22} 100 ${CX + 32} 100 Z`,
+    // Lats (wide V-shape)
+    lats_l: `M ${CX - 40} 98 Q ${CX - 50} 130 ${CX - 40} 180 L ${CX - 14} 180 L ${CX - 16} 100 Q ${CX - 26} 96 ${CX - 40} 98 Z`,
+    lats_r: `M ${CX + 40} 98 Q ${CX + 50} 130 ${CX + 40} 180 L ${CX + 14} 180 L ${CX + 16} 100 Q ${CX + 26} 96 ${CX + 40} 98 Z`,
 
-    middle_back: `M ${CX - 12} 100 L ${CX + 12} 100 L ${CX + 12} 160 L ${CX - 12} 160 Z`,
+    // Middle back (rhomboids)
+    middle_back: `M ${CX - 16} 100 L ${CX + 16} 100 L ${CX + 16} 172 L ${CX - 16} 172 Z`,
 
-    lower_back: `M ${CX - 12} 165 L ${CX + 12} 165 L ${CX + 10} 215 L ${CX - 10} 215 Z`,
+    // Lower back (erector spinae)
+    lower_back: `M ${CX - 14} 178 L ${CX + 14} 178 L ${CX + 12} 240 L ${CX - 12} 240 Z`,
 
-    triceps_l: `M ${CX - 48} 128 Q ${CX - 54} 145 ${CX - 52} 165 L ${CX - 42} 168 Q ${CX - 42} 145 ${CX - 40} 130 Z`,
-    triceps_r: `M ${CX + 48} 128 Q ${CX + 54} 145 ${CX + 52} 165 L ${CX + 42} 168 Q ${CX + 42} 145 ${CX + 40} 130 Z`,
+    // Triceps
+    triceps_l: `M ${CX - 58} 126 Q ${CX - 68} 142 ${CX - 68} 164 Q ${CX - 62} 174 ${CX - 54} 172 Q ${CX - 52} 152 ${CX - 48} 132 Z`,
+    triceps_r: `M ${CX + 58} 126 Q ${CX + 68} 142 ${CX + 68} 164 Q ${CX + 62} 174 ${CX + 54} 172 Q ${CX + 52} 152 ${CX + 48} 132 Z`,
 
-    forearms_l: `M ${CX - 50} 170 Q ${CX - 52} 190 ${CX - 50} 210 L ${CX - 42} 212 Q ${CX - 42} 190 ${CX - 42} 172 Z`,
-    forearms_r: `M ${CX + 50} 170 Q ${CX + 52} 190 ${CX + 50} 210 L ${CX + 42} 212 Q ${CX + 42} 190 ${CX + 42} 172 Z`,
+    // Forearms
+    forearms_l: `M ${CX - 58} 176 Q ${CX - 60} 196 ${CX - 58} 216 Q ${CX - 52} 222 ${CX - 48} 220 Q ${CX - 48} 198 ${CX - 48} 178 Z`,
+    forearms_r: `M ${CX + 58} 176 Q ${CX + 60} 196 ${CX + 58} 216 Q ${CX + 52} 222 ${CX + 48} 220 Q ${CX + 48} 198 ${CX + 48} 178 Z`,
 
-    glutes_l: `M ${CX - 28} 220 Q ${CX - 30} 250 ${CX - 24} 275 L ${CX - 4} 275 L ${CX - 6} 220 Z`,
-    glutes_r: `M ${CX + 28} 220 Q ${CX + 30} 250 ${CX + 24} 275 L ${CX + 4} 275 L ${CX + 6} 220 Z`,
+    // Glutes (rounded, muscular)
+    glutes_l: `M ${CX - 40} 245 Q ${CX - 44} 270 ${CX - 34} 295 Q ${CX - 20} 300 ${CX - 6} 298 L ${CX - 6} 245 Q ${CX - 22} 240 ${CX - 40} 245 Z`,
+    glutes_r: `M ${CX + 40} 245 Q ${CX + 44} 270 ${CX + 34} 295 Q ${CX + 20} 300 ${CX + 6} 298 L ${CX + 6} 245 Q ${CX + 22} 240 ${CX + 40} 245 Z`,
 
-    hamstrings_l: `M ${CX - 28} 305 Q ${CX - 30} 360 ${CX - 26} 400 L ${CX - 8} 400 Q ${CX - 10} 360 ${CX - 6} 305 Z`,
-    hamstrings_r: `M ${CX + 28} 305 Q ${CX + 30} 360 ${CX + 26} 400 L ${CX + 8} 400 Q ${CX + 10} 360 ${CX + 6} 305 Z`,
+    // Hamstrings (thick back thigh)
+    hamstrings_l: `M ${CX - 40} 305 Q ${CX - 44} 350 ${CX - 40} 400 L ${CX - 6} 400 L ${CX - 6} 305 Z`,
+    hamstrings_r: `M ${CX + 6} 305 L ${CX + 6} 400 L ${CX + 40} 400 Q ${CX + 44} 350 ${CX + 40} 305 Z`,
 
-    calves_l: `M ${CX - 26} 405 Q ${CX - 30} 440 ${CX - 28} 480 L ${CX - 12} 480 Q ${CX - 10} 440 ${CX - 10} 405 Z`,
-    calves_r: `M ${CX + 10} 405 Q ${CX + 10} 440 ${CX + 12} 480 L ${CX + 28} 480 Q ${CX + 30} 440 ${CX + 26} 405 Z`,
+    // Calves back (diamond)
+    calves_l: `M ${CX - 36} 405 Q ${CX - 40} 440 ${CX - 36} 480 L ${CX - 12} 480 Q ${CX - 10} 440 ${CX - 10} 405 Z`,
+    calves_r: `M ${CX + 10} 405 Q ${CX + 10} 440 ${CX + 12} 480 L ${CX + 36} 480 Q ${CX + 40} 440 ${CX + 36} 405 Z`,
   },
 };
 
